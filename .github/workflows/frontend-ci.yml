@@ -1,0 +1,53 @@
+name: Frontend CI — Type-check + Build
+
+on:
+  push:
+    branches: [main, development]
+    paths:
+      - "claimgaurd-frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+  pull_request:
+    branches: [main, development]
+    paths:
+      - "claimgaurd-frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+
+defaults:
+  run:
+    working-directory: claimgaurd-frontend
+
+jobs:
+  build:
+    name: Type-check + Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # enable corepack so pnpm is available before setup-node runs
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: claimgaurd-frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (type-check + production build)
+        run: pnpm build
+        env:
+          # Suppress Next.js telemetry in CI
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build
+          path: claimgaurd-frontend/.next/
+          retention-days: 3

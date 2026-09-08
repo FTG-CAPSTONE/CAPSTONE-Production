@@ -31,7 +31,7 @@ export default function DashboardPage() {
           <StatCard label="Auto-approved" value={data.cases_by_status["auto_approved"] ?? 0} />
           <StatCard
             label="Avg. fraud score"
-            value={data.average_fraud_score !== null ? data.average_fraud_score.toFixed(1) : "—"}
+            value={data.average_fraud_score != null ? data.average_fraud_score.toFixed(1) : "—"}
           />
           <StatCard label="Champion model" value={data.current_champion_model ?? "None registered"} />
         </div>

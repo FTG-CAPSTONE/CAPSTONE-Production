@@ -1,38 +1,46 @@
-import type { MLPredictionSummary } from "@/lib/types";
-import { RiskBadge } from "./risk-badge";
+"use client";
 
-export function ShapExplanation({ prediction }: { prediction: MLPredictionSummary }) {
+import type { ShapFeature } from "@/lib/types";
+
+export function ShapExplanation({ features }: { features: ShapFeature[] }) {
+  if (!features?.length) return null;
+
+  // If the only entry is a note (no actual SHAP values), show it plainly
+  if (features.length === 1 && features[0].note && features[0].impact == null) {
+    return <p className="text-xs italic text-slate-500">{features[0].note}</p>;
+  }
+
+  const maxAbs = Math.max(...features.map((f) => Math.abs(f.impact ?? 0)), 0.001);
+
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-2xl font-semibold">{prediction.score.toFixed(1)}</span>
-        <RiskBadge band={prediction.band} />
-      </div>
-      {prediction.confidence !== null && (
-        <p className="mt-1 text-xs text-slate-500">
-          Model confidence: {(prediction.confidence * 100).toFixed(0)}%
-        </p>
-      )}
-      <div className="mt-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Top drivers</p>
-        <ul className="mt-1 space-y-1">
-          {prediction.top_features.map((f, i) => (
-            <li key={i} className="text-sm text-slate-700">
-              {f.feature ? (
-                <>
-                  {f.feature}{" "}
-                  <span className={Number(f.impact) >= 0 ? "text-red-600" : "text-emerald-600"}>
-                    ({Number(f.impact) >= 0 ? "+" : ""}
-                    {f.impact})
-                  </span>
-                </>
-              ) : (
-                f.note
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
+    <div className="space-y-1">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+        Top risk drivers
+      </p>
+      {features.map((f, i) => {
+        const impact = f.impact ?? 0;
+        const pct = (Math.abs(impact) / maxAbs) * 100;
+        const positive = impact >= 0;
+        return (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            <span className="w-36 truncate text-slate-600">{f.feature ?? "—"}</span>
+            <div className="flex-1 h-2 rounded bg-slate-100 overflow-hidden">
+              <div
+                className={`h-full rounded ${positive ? "bg-red-400" : "bg-emerald-400"}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span
+              className={`w-14 text-right tabular-nums ${
+                positive ? "text-red-600" : "text-emerald-600"
+              }`}
+            >
+              {impact > 0 ? "+" : ""}
+              {impact.toFixed(3)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

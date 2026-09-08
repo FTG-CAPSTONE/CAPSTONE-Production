@@ -12,15 +12,17 @@ import {
 } from "@/components/ui/breadcrumb";
 
 const labelMap: Record<string, string> = {
-  dashboard:  "Dashboard",
-  cases:      "Cases",
-  hitl:       "Review Queue",
-  "ml-admin": "ML Admin",
-  analytics:  "Analytics",
-  quality:    "Data Quality",
-  audit:      "Audit Trail",
-  settings:   "Settings",
-  help:       "Help",
+  dashboard:      "Dashboard",
+  cases:          "Cases",
+  hitl:           "Review Queue",
+  investigations: "Investigations",
+  "ml-admin":     "ML Admin",
+  analytics:      "Analytics",
+  quality:        "Data Quality",
+  audit:          "Audit Trail",
+  admin:          "Admin",
+  settings:       "Settings",
+  help:           "Help",
 };
 
 export function DynamicBreadcrumb() {
@@ -40,25 +42,31 @@ export function DynamicBreadcrumb() {
           const isLast = index === segments.length - 1;
 
           return (
-            <BreadcrumbItem
-              key={href}
-              className={
-                index === 0 && segments.length > 1
-                  ? "hidden md:block"
-                  : undefined
-              }
-            >
-              {isLast ? (
-                <BreadcrumbPage>{label}</BreadcrumbPage>
-              ) : (
-                <>
+            // BreadcrumbItem and BreadcrumbSeparator are both <li> elements.
+            // They must be siblings inside the <ol> (BreadcrumbList),
+            // never nested inside each other.
+            <>
+              <BreadcrumbItem
+                key={`item-${href}`}
+                className={
+                  !isLast && segments.length > 1 ? "hidden md:flex" : undefined
+                }
+              >
+                {isLast ? (
+                  <BreadcrumbPage>{label}</BreadcrumbPage>
+                ) : (
                   <BreadcrumbLink render={<Link href={href} />}>
                     {label}
                   </BreadcrumbLink>
-                  <BreadcrumbSeparator className="hidden md:block" />
-                </>
+                )}
+              </BreadcrumbItem>
+              {!isLast && (
+                <BreadcrumbSeparator
+                  key={`sep-${href}`}
+                  className="hidden md:flex"
+                />
               )}
-            </BreadcrumbItem>
+            </>
           );
         })}
       </BreadcrumbList>

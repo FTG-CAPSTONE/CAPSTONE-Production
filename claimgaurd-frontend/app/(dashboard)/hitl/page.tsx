@@ -28,10 +28,12 @@ export default function HitlPage() {
               <li key={item.id} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">Case {item.case_id.slice(0, 8)}</p>
-                  <p className="text-xs text-slate-500">{item.reason.replace(/_/g, " ")}</p>
+                  <p className="text-xs text-slate-500">{item.reason?.replace(/_/g, " ") ?? "—"}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-semibold">{item.priority_score.toFixed(1)}</span>
+                  <span className="text-sm font-semibold">
+                    {item.priority_score != null ? Number(item.priority_score).toFixed(1) : "—"}
+                  </span>
                   <Link href={`/cases/${item.case_id}`} className="text-sm text-blue-700 hover:underline">
                     Review →
                   </Link>

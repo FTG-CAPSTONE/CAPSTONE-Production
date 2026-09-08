@@ -11,7 +11,7 @@ export default function AnalyticsPage() {
     queryFn: async () => (await apiClient.get<AnalyticsOverview>("/api/analytics/overview")).data,
   });
 
-  const byLine = Object.entries(data?.cases_by_line_of_business ?? {}).map(([name, value]) => ({ name, value }));
+  const byLine = Object.entries(data?.cases_by_lob ?? {}).map(([name, value]) => ({ name, value }));
   const byStatus = Object.entries(data?.cases_by_status ?? {}).map(([name, value]) => ({ name, value }));
 
   return (

@@ -76,17 +76,20 @@ export default function MlAdminPage() {
           {overview?.champion ? (
             <p className="text-sm">
               Current champion: <span className="font-semibold">{overview.champion.version}</span> (F1{" "}
-              {overview.champion.f1_score})
+              {overview.champion.f1_score ?? "—"})
             </p>
           ) : (
             <p className="text-sm text-amber-700">
               ⚠ No champion model is registered. All cases route to human review until one is approved.
             </p>
           )}
-          {!!overview?.challengers_awaiting_review.length && (
+          {overview?.challenger_pending && (
             <p className="mt-1 text-sm text-blue-700">
-              {overview.challengers_awaiting_review.length} challenger(s) awaiting your review below.
+              Challenger <strong>{overview.challenger_pending.version}</strong> is awaiting your review below.
             </p>
+          )}
+          {overview?.note && (
+            <p className="mt-1 text-sm text-muted-foreground">{overview.note}</p>
           )}
         </div>
       </section>
@@ -142,14 +145,34 @@ export default function MlAdminPage() {
         <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-slate-500">Training Runs</h2>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <ul className="space-y-2 text-sm">
-            {(runs ?? []).map((r) => (
-              <li key={r.id} className="flex justify-between">
-                <span>
-                  {r.status} · {r.rows_used} rows
-                </span>
-                <span className="text-slate-500">{JSON.stringify(r.metrics)}</span>
-              </li>
-            ))}
+            {(runs ?? []).map((r) => {
+              const duration =
+                r.completed_at && r.started_at
+                  ? Math.round(
+                      (new Date(r.completed_at).getTime() - new Date(r.started_at).getTime()) / 1000
+                    ) + "s"
+                  : r.status === "running" ? "running…" : "—";
+              return (
+                <li key={r.id} className="flex justify-between">
+                  <span>
+                    <span
+                      className={`mr-2 rounded px-1.5 py-0.5 text-xs ${
+                        r.status === "completed"
+                          ? "bg-green-100 text-green-700"
+                          : r.status === "failed"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {r.status}
+                    </span>
+                    {r.rows_used ?? "?"} rows
+                    {r.fraud_rate != null && ` · fraud rate ${(Number(r.fraud_rate) * 100).toFixed(1)}%`}
+                  </span>
+                  <span className="text-slate-500">{duration}</span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </section>

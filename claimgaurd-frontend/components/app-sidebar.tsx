@@ -25,26 +25,25 @@ import {
   ShieldCheckIcon,
   SettingsIcon,
   LifeBuoyIcon,
+  SearchIcon,
+  UsersIcon,
 } from "lucide-react";
 
 const data = {
-  user: {
-    name: "ClaimGuard User",
-    email: "admin@claimguard.co.ke",
-    initials: "CG",
-  },
   navMain: [
-    { title: "Dashboard",    url: "/dashboard",  icon: <LayoutDashboardIcon /> },
-    { title: "Cases",        url: "/cases",       icon: <FolderOpenIcon /> },
-    { title: "Review Queue", url: "/hitl",        icon: <ClipboardListIcon /> },
-    { title: "ML Admin",     url: "/ml-admin",    icon: <BrainCircuitIcon /> },
-    { title: "Analytics",    url: "/analytics",   icon: <BarChart3Icon /> },
-    { title: "Data Quality", url: "/quality",     icon: <DatabaseZapIcon /> },
-    { title: "Audit Trail",  url: "/audit",       icon: <ScrollTextIcon /> },
+    { title: "Dashboard",       url: "/dashboard",       icon: <LayoutDashboardIcon /> },
+    { title: "Cases",           url: "/cases",           icon: <FolderOpenIcon /> },
+    { title: "Review Queue",    url: "/hitl",            icon: <ClipboardListIcon /> },
+    { title: "Investigations",  url: "/investigations",  icon: <SearchIcon /> },
+    { title: "ML Admin",        url: "/ml-admin",        icon: <BrainCircuitIcon /> },
+    { title: "Analytics",       url: "/analytics",       icon: <BarChart3Icon /> },
+    { title: "Data Quality",    url: "/quality",         icon: <DatabaseZapIcon /> },
+    { title: "Audit Trail",     url: "/audit",           icon: <ScrollTextIcon /> },
   ],
   navSecondary: [
-    { title: "Settings",     url: "/settings",    icon: <SettingsIcon /> },
-    { title: "Help",         url: "/help",        icon: <LifeBuoyIcon /> },
+    { title: "Admin",    url: "/admin",    icon: <UsersIcon /> },
+    { title: "Settings", url: "/settings", icon: <SettingsIcon /> },
+    { title: "Help",     url: "/help",     icon: <LifeBuoyIcon /> },
   ],
 };
 
@@ -75,7 +74,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser />
       </SidebarFooter>
     </Sidebar>
   );

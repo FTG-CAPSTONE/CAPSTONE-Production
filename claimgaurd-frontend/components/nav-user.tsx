@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Avatar,
@@ -20,24 +21,45 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { ChevronsUpDownIcon, LogOutIcon, UserIcon } from "lucide-react";
-import { clearToken } from "@/lib/api-client";
+import { apiClient, clearToken } from "@/lib/api-client";
 
-export function NavUser({
-  user,
-}: {
-  user: {
-    name: string;
-    email: string;
-    initials: string;
-  };
-}) {
+interface UserMe {
+  full_name: string;
+  username: string;
+  email: string | null;
+  role: string;
+}
+
+// Fallback user shown while /api/auth/me loads or when unauthenticated
+const FALLBACK: UserMe = { full_name: "ClaimGuard", username: "user", email: null, role: "" };
+
+export function NavUser() {
   const { isMobile } = useSidebar();
   const router = useRouter();
+  const [user, setUser] = useState<UserMe>(FALLBACK);
+
+  useEffect(() => {
+    apiClient
+      .get<UserMe>("/api/auth/me")
+      .then((r) => setUser(r.data))
+      .catch(() => {
+        // Token gone or expired — redirect to login
+        clearToken();
+        router.push("/login");
+      });
+  }, [router]);
 
   function handleLogout() {
     clearToken();
     router.push("/login");
   }
+
+  const initials = user.full_name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <SidebarMenu>
@@ -49,11 +71,13 @@ export function NavUser({
             }
           >
             <Avatar>
-              <AvatarFallback>{user.initials}</AvatarFallback>
+              <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{user.name}</span>
-              <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+              <span className="truncate font-medium">{user.full_name}</span>
+              <span className="truncate text-xs text-muted-foreground capitalize">
+                {user.role || user.email || user.username}
+              </span>
             </div>
             <ChevronsUpDownIcon className="ml-auto size-4" />
           </DropdownMenuTrigger>
@@ -66,18 +90,20 @@ export function NavUser({
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar>
-                  <AvatarFallback>{user.initials}</AvatarFallback>
+                  <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                  <span className="truncate font-medium">{user.full_name}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {user.email ?? user.username}
+                  </span>
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/settings")}>
               <UserIcon />
-              Profile
+              Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>

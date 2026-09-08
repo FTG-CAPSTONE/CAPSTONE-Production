@@ -127,3 +127,10 @@ dmypy.json
 # ======================
 .aws/
 credentials
+
+# ======================
+# Reference docs — local context only, never commit
+# ======================
+REFERENCE/
+REFERENCE*/
+*.zip

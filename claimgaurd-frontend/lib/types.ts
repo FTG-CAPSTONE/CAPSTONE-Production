@@ -275,3 +275,105 @@ export interface RuleCatalogueEntry {
   description: string | null;
   line_of_business: string | null;
 }
+
+// ── ML Performance ────────────────────────────────────────────────────────────
+
+export interface ROCPoint {
+  fpr: number;
+  tpr: number;
+  threshold: number;
+}
+
+export interface ConfusionMatrix {
+  tp: number;
+  fp: number;
+  tn: number;
+  fn: number;
+  precision: number;
+  recall: number;
+  f1: number;
+}
+
+export interface MetricHistoryPoint {
+  version: string;
+  trained_at: string;
+  status: string;
+  auc_roc: number | null;
+  f1_score: number | null;
+  precision: number | null;
+  recall: number | null;
+  false_positive_rate: number | null;
+  trained_rows: number | null;
+}
+
+export interface FeatureImportanceItem {
+  feature: string;
+  importance: number;
+}
+
+export interface MLPerformanceResponse {
+  model_version: string;
+  model_id: string;
+  trained_rows: number | null;
+  auc_roc: number | null;
+  f1_score: number | null;
+  precision: number | null;
+  recall: number | null;
+  false_positive_rate: number | null;
+  roc_curve: ROCPoint[];
+  confusion_matrix: ConfusionMatrix | null;
+  metric_history: MetricHistoryPoint[];
+  feature_importances: FeatureImportanceItem[];
+}
+
+// ── Network / Ring Detection ──────────────────────────────────────────────────
+
+export type RiskLevel = "low" | "medium" | "high" | "critical" | "unknown";
+
+export interface RingSummary {
+  ring_id: string;
+  ring_type: string;
+  case_count: number;
+  flagged_count: number;
+  total_amount_kes: number;
+  avg_fraud_score: number | null;
+  risk_level: RiskLevel;
+  hub_label: string;
+  hub_type: string;
+  case_ids: string[];
+  first_seen: string | null;
+  last_seen: string | null;
+}
+
+export interface RingsListResponse {
+  rings: RingSummary[];
+  total_rings: number;
+  total_flagged_cases: number;
+  critical_rings: number;
+  high_rings: number;
+  generated_at: string;
+}
+
+export interface NetworkNode {
+  id: string;
+  node_type: string;
+  label: string;
+  fraud_score: number | null;
+  status: string | null;
+  amount: number | null;
+  risk_level: RiskLevel;
+}
+
+export interface NetworkEdge {
+  source: string;
+  target: string;
+  edge_type: string;
+  weight: number;
+}
+
+export interface NetworkGraphResponse {
+  ring_id: string;
+  nodes: NetworkNode[];
+  edges: NetworkEdge[];
+  summary: RingSummary;
+}

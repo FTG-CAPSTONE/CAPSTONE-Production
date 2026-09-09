@@ -18,6 +18,25 @@ byte-for-byte against `lib/types.ts`.
 | `/analytics` | Charts (cases by line of business, by status) |
 | `/quality` | Data quality pass/fail summary |
 
+## Syncing to the Capstone Frontend Repo
+
+This folder is mirrored to [FTG-CAPSTONE/frontend-dev](https://github.com/FTG-CAPSTONE/frontend-dev)
+for Vercel deployment using `git subtree push` from the monorepo root.
+
+```bash
+# Run from the monorepo root — NOT from inside this folder
+cd /home/kakito/Documents/PROJECT/claim-gaurd
+
+git subtree push --prefix=claimgaurd-frontend https://github.com/FTG-CAPSTONE/frontend-dev.git main
+```
+
+**Rules:**
+- Always commit changes to the monorepo first (`git push origin main`), then run the subtree push
+- Never run `git init` inside `claimgaurd-frontend/` — that breaks the monorepo tracking
+- Vercel auto-deploys from `FTG-CAPSTONE/frontend-dev` on every subtree push
+
+---
+
 ## Run it
 
 ```bash

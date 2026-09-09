@@ -184,6 +184,31 @@ Both `.env.example` (backend) and `.env.local.example` (frontend) have correct d
 
 ---
 
+## Syncing the Frontend to the Capstone Frontend Repo
+
+The `claimgaurd-frontend/` folder is also maintained as a standalone repo at
+[FTG-CAPSTONE/frontend-dev](https://github.com/FTG-CAPSTONE/frontend-dev) for Vercel deployment.
+
+Use `git subtree push` to sync changes from the monorepo to that repo **without affecting
+the monorepo root or any other folder**:
+
+```bash
+# Run from the monorepo root
+cd /home/kakito/Documents/PROJECT/claim-gaurd
+
+git subtree push --prefix=claimgaurd-frontend https://github.com/FTG-CAPSTONE/frontend-dev.git main
+```
+
+**When to run this:**
+- After any frontend commit that is ready to deploy to Vercel
+- Vercel watches `FTG-CAPSTONE/frontend-dev` and auto-deploys on every push
+
+**This does not affect:**
+- The root monorepo (`claim-gaurd`) — all folders, history, and remotes stay intact
+- The backend — `claimgaurd-backend/` is never touched by this command
+
+---
+
 ## Further Reading
 
 - [`claimgaurd-backend/README.md`](claimgaurd-backend/README.md) — backend module layout, ETL pipeline, ML pipeline, all endpoints, Docker details

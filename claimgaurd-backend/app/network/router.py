@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import and_, func, or_, select
 
 from app.cases.models import Case, Party, Policy, Vehicle
 from app.core.deps import CurrentUser, DBSession
@@ -134,13 +134,12 @@ async def list_rings(
             func.count(Case.id).label("case_count"),
             func.sum(Case.amount_claimed).label("total_amount"),
             func.avg(Case.fraud_score).label("avg_score"),
-            func.sum(
-                func.cast(
-                    or_(
-                        Case.fraud_score >= fraud_threshold,
-                        Case.status.in_(["auto_rejected", "declined"]),
-                    ).cast(text("integer")),
-                    type_=None,
+            func.count(
+                Case.id
+            ).filter(
+                or_(
+                    Case.fraud_score >= str(fraud_threshold),
+                    Case.status.in_(["auto_rejected", "declined"]),
                 )
             ).label("flagged_count"),
             func.min(Case.submitted_at).label("first_seen"),

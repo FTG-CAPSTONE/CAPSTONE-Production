@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
@@ -12,6 +13,9 @@ import {
   Loader2Icon,
   CheckIcon,
   ShieldIcon,
+  TrendingUpIcon,
+  UsersIcon,
+  ZapIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +47,12 @@ const itemVariants = {
   },
 };
 
+const STATS = [
+  { icon: TrendingUpIcon, value: "91.2%",  label: "Auto-decision rate" },
+  { icon: ZapIcon,        value: "<30s",   label: "Avg. processing time" },
+  { icon: UsersIcon,      value: "7 roles", label: "RBAC access control" },
+];
+
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("admin");
@@ -62,6 +72,8 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
       setToken(data.access_token);
+      // Set session cookie for proxy route guard
+      document.cookie = `cg_session=1; path=/; SameSite=Strict`;
       setIsSuccess(true);
       setTimeout(() => router.push("/dashboard"), 600);
     } catch {
@@ -73,41 +85,103 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-svh">
-      {/* Left panel — brand */}
-      <div className="relative hidden w-1/2 flex-col justify-between bg-zinc-950 lg:flex">
-        {/* Logo */}
-        <div className="relative z-20 flex items-center gap-2.5 p-8">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-white text-black">
-            <ShieldCheckIcon className="size-4" />
+
+      {/* ── Left panel — hero image + brand overlay ── */}
+      <div className="relative hidden w-[52%] lg:block overflow-hidden">
+
+        {/* Full-bleed hero photo */}
+        <Image
+          src="/login-hero.jpg"
+          alt="Insurance professional reviewing claims"
+          fill
+          className="object-cover object-center"
+          priority
+          sizes="52vw"
+        />
+
+        {/* Dark gradient overlay — heavier at top and bottom, lighter in middle */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/30 to-black/80" />
+
+        {/* Top — Logo */}
+        <div className="absolute top-0 left-0 right-0 z-20 flex items-center gap-2.5 p-8">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-white/95 shadow-lg">
+            <ShieldCheckIcon className="size-5 text-slate-900" />
           </div>
-          <span className="text-sm font-semibold text-white">ClaimGuard</span>
+          <div>
+            <span className="text-base font-bold text-white tracking-tight">ClaimGuard</span>
+            <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium text-white/80 uppercase tracking-wide">
+              v2
+            </span>
+          </div>
         </div>
 
-        {/* Centre graphic */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4 opacity-10">
-            <ShieldCheckIcon className="size-48 text-white" strokeWidth={0.5} />
-          </div>
+        {/* Centre — headline copy */}
+        <div className="absolute inset-0 z-10 flex flex-col items-start justify-center px-10">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+          >
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-emerald-400">
+              AI-Powered Claims Intelligence
+            </p>
+            <h2 className="text-4xl font-bold leading-tight text-white max-w-xs">
+              Detect fraud.<br />Decide faster.<br />Stay compliant.
+            </h2>
+            <p className="mt-4 text-sm leading-relaxed text-white/65 max-w-xs">
+              Kenya's bancassurance-scale trust layer — combining machine learning,
+              rules engines, and human review in one auditable platform.
+            </p>
+          </motion.div>
         </div>
 
-        {/* Feature list */}
-        <div className="relative z-20 mt-auto p-8">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm space-y-3">
-            {[
-              "AI-powered fraud detection & risk scoring",
-              "Real-time claims analytics & decision support",
-              "Human-in-the-loop review workflow",
-            ].map((feat) => (
-              <div key={feat} className="flex items-start gap-2.5">
-                <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-                <span className="text-sm text-white/70">{feat}</span>
+        {/* Bottom — stat chips + feature list */}
+        <div className="absolute bottom-0 left-0 right-0 z-20 p-8 space-y-4">
+
+          {/* Stat chips */}
+          <motion.div
+            className="flex gap-3"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.45 }}
+          >
+            {STATS.map(({ icon: Icon, value, label }) => (
+              <div
+                key={label}
+                className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 backdrop-blur-md"
+              >
+                <Icon className="size-3.5 shrink-0 text-emerald-400" />
+                <div>
+                  <p className="text-xs font-bold text-white">{value}</p>
+                  <p className="text-[10px] text-white/55 leading-none mt-0.5">{label}</p>
+                </div>
               </div>
             ))}
-          </div>
+          </motion.div>
+
+          {/* Feature bullets */}
+          <motion.div
+            className="rounded-2xl border border-white/10 bg-black/40 p-5 backdrop-blur-md space-y-2.5"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            {[
+              "AI fraud scoring with full SHAP explainability",
+              "Human-in-the-loop review queue with audit trail",
+              "Motor, health & marine lines — IRA compliance built in",
+            ].map((feat) => (
+              <div key={feat} className="flex items-start gap-2.5">
+                <CheckIcon className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
+                <span className="text-xs text-white/70 leading-relaxed">{feat}</span>
+              </div>
+            ))}
+          </motion.div>
+
         </div>
       </div>
 
-      {/* Right panel — form */}
+      {/* ── Right panel — sign-in form ── */}
       <div className="flex flex-1 items-center justify-center bg-background px-6 py-12">
         <motion.div
           className="w-full max-w-sm"
@@ -120,13 +194,14 @@ export default function LoginPage() {
             className="mb-8 flex flex-col items-center lg:hidden"
             variants={itemVariants}
           >
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <ShieldCheckIcon className="size-5" />
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+              <ShieldCheckIcon className="size-6" />
             </div>
+            <p className="mt-2 text-sm font-semibold text-foreground">ClaimGuard</p>
           </motion.div>
 
           {/* Heading */}
-          <motion.div className="text-center" variants={itemVariants}>
+          <motion.div className="mb-8 text-center" variants={itemVariants}>
             <h1 className="text-2xl font-semibold tracking-tight">
               Welcome back
             </h1>
@@ -136,7 +211,7 @@ export default function LoginPage() {
           </motion.div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <motion.div variants={itemVariants}>
               <label htmlFor="username" className="mb-1.5 block text-sm font-medium">
                 Username
@@ -190,10 +265,7 @@ export default function LoginPage() {
             </motion.div>
 
             {error && (
-              <motion.p
-                variants={itemVariants}
-                className="text-sm text-destructive"
-              >
+              <motion.p variants={itemVariants} className="text-sm text-destructive">
                 {error}
               </motion.p>
             )}
@@ -222,9 +294,9 @@ export default function LoginPage() {
             </motion.div>
           </form>
 
-          {/* Secured badge */}
+          {/* Security badge */}
           <motion.div
-            className="mt-8 flex items-center justify-center gap-1.5 text-xs text-muted-foreground/60"
+            className="mt-8 flex items-center justify-center gap-1.5 text-xs text-muted-foreground/50"
             variants={itemVariants}
           >
             <ShieldIcon className="size-3.5" />
@@ -232,6 +304,7 @@ export default function LoginPage() {
           </motion.div>
         </motion.div>
       </div>
+
     </div>
   );
 }

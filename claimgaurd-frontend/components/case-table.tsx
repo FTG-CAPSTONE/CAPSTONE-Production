@@ -1,91 +1,204 @@
 "use client";
 
 import Link from "next/link";
-import type { CaseSummary, FraudBand } from "@/lib/types";
+import type { CaseSummary, CaseStatus, FraudBand } from "@/lib/types";
+import { StatusBadge } from "@/components/status-badge";
+import { RiskBadge } from "@/components/risk-badge";
+import { EmptyState } from "@/components/empty-state";
+import { formatCurrency } from "@/lib/utils";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from "lucide-react";
 
-const STATUS_BADGE: Record<string, string> = {
-  received:      "bg-slate-100 text-slate-600",
-  processing:    "bg-blue-100 text-blue-700",
-  in_review:     "bg-amber-100 text-amber-700",
-  auto_approved: "bg-emerald-100 text-emerald-700",
-  auto_rejected: "bg-red-100 text-red-700",
-  approved:      "bg-green-100 text-green-700",
-  declined:      "bg-orange-100 text-orange-700",
-  closed:        "bg-zinc-100 text-zinc-600",
-};
+export type SortField = "external_claim_id" | "amount_claimed" | "fraud_score" | "submitted_at" | "status";
+export type SortOrder = "asc" | "desc";
 
-const BAND_BADGE: Record<FraudBand, string> = {
-  low:      "bg-green-50 text-green-700",
-  medium:   "bg-amber-50 text-amber-700",
-  high:     "bg-orange-100 text-orange-700",
-  critical: "bg-red-100 text-red-700 font-semibold",
-};
+interface CaseTableProps {
+  cases: CaseSummary[];
+  sortField?: SortField;
+  sortOrder?: SortOrder;
+  onSort?: (field: SortField) => void;
+  emptyVariant?: "no-data" | "search" | "filter";
+}
 
-export function CaseTable({ cases }: { cases: CaseSummary[] }) {
-  if (!cases.length) {
-    return <p className="p-6 text-sm text-slate-500">No cases match this filter.</p>;
-  }
+function SortableHeader({
+  children,
+  field,
+  currentField,
+  currentOrder,
+  onSort,
+}: {
+  children: React.ReactNode;
+  field: SortField;
+  currentField?: SortField;
+  currentOrder?: SortOrder;
+  onSort?: (field: SortField) => void;
+}) {
+  const isActive = currentField === field;
+  
+  const SortIcon = !isActive
+    ? ArrowUpDown
+    : currentOrder === "asc"
+      ? ArrowUp
+      : ArrowDown;
+
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-          <th className="py-2 pr-4">Reference</th>
-          <th className="py-2 pr-4">Type</th>
-          <th className="py-2 pr-4">Amount</th>
-          <th className="py-2 pr-4">Score</th>
-          <th className="py-2 pr-4">Status</th>
-          <th className="py-2" />
-        </tr>
-      </thead>
-      <tbody>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="-ml-3 h-8 data-[state=open]:bg-accent"
+      onClick={() => onSort?.(field)}
+    >
+      {children}
+      <SortIcon className="ml-2 h-4 w-4" />
+    </Button>
+  );
+}
+
+export function CaseTable({
+  cases,
+  sortField,
+  sortOrder,
+  onSort,
+  emptyVariant = "no-data",
+}: CaseTableProps) {
+  if (!cases.length) {
+    return (
+      <EmptyState
+        variant={emptyVariant}
+        title={emptyVariant === "filter" ? "No cases match your filters" : "No cases found"}
+        description={
+          emptyVariant === "filter"
+            ? "Try adjusting your filters or search terms."
+            : "Cases will appear here once submitted."
+        }
+      />
+    );
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>
+            {onSort ? (
+              <SortableHeader
+                field="external_claim_id"
+                currentField={sortField}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              >
+                Reference
+              </SortableHeader>
+            ) : (
+              "Reference"
+            )}
+          </TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>LOB</TableHead>
+          <TableHead className="text-right">
+            {onSort ? (
+              <SortableHeader
+                field="amount_claimed"
+                currentField={sortField}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              >
+                Amount
+              </SortableHeader>
+            ) : (
+              "Amount"
+            )}
+          </TableHead>
+          <TableHead>
+            {onSort ? (
+              <SortableHeader
+                field="fraud_score"
+                currentField={sortField}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              >
+                Risk
+              </SortableHeader>
+            ) : (
+              "Risk"
+            )}
+          </TableHead>
+          <TableHead>
+            {onSort ? (
+              <SortableHeader
+                field="status"
+                currentField={sortField}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              >
+                Status
+              </SortableHeader>
+            ) : (
+              "Status"
+            )}
+          </TableHead>
+          <TableHead>
+            {onSort ? (
+              <SortableHeader
+                field="submitted_at"
+                currentField={sortField}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              >
+                Submitted
+              </SortableHeader>
+            ) : (
+              "Submitted"
+            )}
+          </TableHead>
+          <TableHead className="w-[50px]" />
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {cases.map((c) => (
-          <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
-            {/* external_claim_id — correct backend field */}
-            <td className="py-2 pr-4 font-mono text-xs">
-              {c.external_claim_id ? c.external_claim_id.slice(-12) : c.id.slice(0, 8)}
-            </td>
-            <td className="py-2 pr-4 capitalize">
-              {c.claim_type?.replace(/_/g, " ") ?? c.line_of_business}
-            </td>
-            {/* amount_claimed — Decimal serialised as string */}
-            <td className="py-2 pr-4 tabular-nums">
-              {c.amount_claimed
-                ? `KES ${parseFloat(c.amount_claimed).toLocaleString()}`
-                : "—"}
-            </td>
-            <td className="py-2 pr-4">
-              {c.fraud_score != null ? (
-                <span
-                  className={`rounded px-1.5 py-0.5 text-xs ${
-                    BAND_BADGE[c.fraud_band ?? "low"] ?? ""
-                  }`}
-                >
-                  {parseFloat(c.fraud_score).toFixed(0)}
-                </span>
-              ) : (
-                "—"
-              )}
-            </td>
-            <td className="py-2 pr-4">
-              <span
-                className={`rounded px-2 py-0.5 text-xs ${
-                  STATUS_BADGE[c.status] ?? "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {c.status.replace(/_/g, " ")}
-              </span>
-            </td>
-            <td className="py-2 text-right">
-              <Link
-                href={`/cases/${c.id}`}
-                className="text-xs text-blue-700 hover:underline"
-              >
-                View →
+          <TableRow key={c.id}>
+            <TableCell className="font-mono text-xs">
+              {c.external_claim_id
+                ? c.external_claim_id.slice(-12)
+                : c.id.slice(0, 8)}
+            </TableCell>
+            <TableCell className="capitalize">
+              {c.claim_type?.replace(/_/g, " ") ?? "—"}
+            </TableCell>
+            <TableCell className="capitalize">
+              {c.line_of_business.replace(/_/g, " ")}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatCurrency(c.amount_claimed)}
+            </TableCell>
+            <TableCell>
+              <RiskBadge band={c.fraud_band} score={c.fraud_score} showScore />
+            </TableCell>
+            <TableCell>
+              <StatusBadge status={c.status} />
+            </TableCell>
+            <TableCell className="text-muted-foreground text-xs">
+              {new Date(c.submitted_at).toLocaleDateString()}
+            </TableCell>
+            <TableCell>
+              <Link href={`/cases/${c.id}`}>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="sr-only">View case</span>
+                </Button>
               </Link>
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }

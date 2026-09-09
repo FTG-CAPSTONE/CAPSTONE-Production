@@ -37,11 +37,10 @@ services:
 
     rootDir: .          # repo root IS the backend (see Step 1 in the guide)
     buildCommand: pip install -r requirements.txt
-    startCommand: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port $PORT
-      --workers 2
+    # honcho runs uvicorn + celery worker + celery beat in one container
+    # This avoids needing a paid Background Worker service on Render.
+    # Switch back to bare uvicorn + separate worker service when upgrading to paid.
+    startCommand: honcho start -f Procfile.render
     healthCheckPath: /health
 
     envVars:

@@ -1,0 +1,9 @@
+# ClaimGuard — Render Procfile (honcho multi-process)
+# Used when running API + Celery worker in the same free web service container.
+# honcho starts both processes and forwards $PORT to uvicorn.
+#
+# Start command on Render: honcho start -f Procfile.render
+
+web: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+worker: celery -A workers.celery_app worker --loglevel=info -Q default,etl,ml,notifications --concurrency=1
+beat: celery -A workers.celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule

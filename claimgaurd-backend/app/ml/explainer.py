@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-import numpy as np
-import shap
+# numpy and shap are lazy-imported inside explain_prediction() to keep idle
+# process RAM within Render's 512 MB free-tier limit. They only load on the
+# first scoring call, then stay cached by Python's module system.
 
 
 def explain_prediction(
@@ -26,6 +27,8 @@ def explain_prediction(
     with a note — the caller handles the graceful fallback.
     """
     try:
+        import numpy as np
+        import shap
         import pandas as pd
 
         row = pd.DataFrame([{k: feature_vector.get(k, 0) for k in feature_names}])

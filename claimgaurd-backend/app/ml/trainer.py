@@ -3,24 +3,17 @@ from __future__ import annotations
 import io
 import os
 import pickle
-import tempfile
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, Tuple
 
-import numpy as np
-import pandas as pd
-from sklearn.metrics import (
-    average_precision_score,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
-from sklearn.model_selection import train_test_split
-from sklearn.utils.class_weight import compute_sample_weight
-from xgboost import XGBClassifier
+# ── NOTE: numpy, pandas, sklearn, xgboost are intentionally NOT imported at
+# module level. They consume ~360 MB of RAM on import and are only needed when
+# a training run is triggered. Lazy-importing them inside run_training_pipeline()
+# and _build_dataset() keeps the idle worker and API process within Render's
+# 512 MB free-tier limit.
+# ─────────────────────────────────────────────────────────────────────────────
 
 from app.core.db import SyncSessionLocal
 
@@ -58,6 +51,19 @@ def run_training_pipeline(
     8. Register as challenger in model_registry
     9. Return metrics dict
     """
+    # Lazy-load heavy ML stack — only pays the RAM cost when training is called
+    import numpy as np
+    import pandas as pd
+    from sklearn.metrics import (
+        f1_score,
+        precision_score,
+        recall_score,
+        roc_auc_score,
+    )
+    from sklearn.model_selection import train_test_split
+    from sklearn.utils.class_weight import compute_sample_weight
+    from xgboost import XGBClassifier
+
     import app.users.models  # noqa: F401
     import app.cases.models  # noqa: F401
     import app.ml.models  # noqa: F401
@@ -216,7 +222,7 @@ def run_training_pipeline(
         db.close()
 
 
-def _build_dataset(db) -> Tuple[pd.DataFrame, np.ndarray]:
+def _build_dataset(db) -> Tuple["pd.DataFrame", "np.ndarray"]:
     """
     Build the labeled training dataset from feature_snapshot + fraud labels.
 
@@ -224,6 +230,8 @@ def _build_dataset(db) -> Tuple[pd.DataFrame, np.ndarray]:
     1. model_feedback rows with source='human_review' (most reliable)
     2. segment_data.is_fraud=True from the synthetic injector (training signal)
     """
+    import numpy as np
+    import pandas as pd
     from sqlalchemy import select, text
     from app.ml.models import FeatureSnapshot, ModelFeedback
     from app.cases.models import Case

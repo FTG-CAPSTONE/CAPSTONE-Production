@@ -1,0 +1,16 @@
+# ClaimGuard — Procfile
+# Used by Render (and Heroku-compatible platforms) to define process types.
+# render.yaml startCommands take precedence on Render; this is a fallback
+# and a clear reference for what each process does.
+
+# ── Web (FastAPI) ─────────────────────────────────────────────────────────────
+web: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
+
+# ── Celery Worker ─────────────────────────────────────────────────────────────
+worker: celery -A workers.celery_app worker --loglevel=info -Q default,etl,ml,notifications --concurrency=2
+
+# ── Celery Beat Scheduler ─────────────────────────────────────────────────────
+beat: celery -A workers.celery_app beat --loglevel=info
+
+# ── Database migrations (run once before first deploy, or as a release command)
+# release: alembic upgrade head

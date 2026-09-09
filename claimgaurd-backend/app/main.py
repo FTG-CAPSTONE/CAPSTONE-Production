@@ -167,6 +167,9 @@ def create_app() -> FastAPI:
     from app.audit.router import router as audit_router
     app.include_router(audit_router)
 
+    from app.network.router import router as network_router
+    app.include_router(network_router)
+
     # ── Health check ──────────────────────────────────────────────────────────
     @app.get("/health", tags=["system"])
     async def health():

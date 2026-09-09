@@ -6,7 +6,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { UserPlusIcon, RefreshCwIcon } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { priorityColour, priorityRowClass, fmtKES, fmtNumber } from "@/lib/constants";
+import { priorityColour, priorityRowClass } from "@/lib/constants";
+import { formatCurrency } from "@/lib/utils";
 import type { ReviewQueueItem } from "@/lib/types";
 import {
   Table, TableBody, TableCell, TableHead,
@@ -147,7 +148,7 @@ export default function HitlPage() {
                     {item.reason?.replace(/_/g, " ") ?? "—"}
                   </TableCell>
                   <TableCell className="tabular-nums text-sm">
-                    {item.amount != null ? fmtKES(item.amount) : "—"}
+                    {item.amount_claimed != null ? formatCurrency(item.amount_claimed) : "—"}
                   </TableCell>
                   <TableCell className="text-sm">
                     {item.assigned_to ? (

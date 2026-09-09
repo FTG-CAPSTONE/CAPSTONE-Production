@@ -1,5 +1,5 @@
 /**
- * @deprecated Use the full cases page at app/(dashboard)/cases/page.tsx
- * This file kept as a thin re-export to prevent import errors during migration.
+ * The case list UI lives in app/(dashboard)/cases/page.tsx.
+ * This shim keeps any remaining imports working during migration.
  */
 export { CaseStatusBadge as CaseTable } from "@/components/cases/case-status-badge";

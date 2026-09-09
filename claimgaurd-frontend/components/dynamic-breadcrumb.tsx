@@ -13,17 +13,21 @@ import {
 } from "@/components/ui/breadcrumb";
 
 const labelMap: Record<string, string> = {
-  dashboard:      "Dashboard",
-  cases:          "Cases",
-  hitl:           "Review Queue",
-  investigations: "Investigations",
-  "ml-admin":     "ML Admin",
-  analytics:      "Analytics",
-  quality:        "Data Quality",
-  audit:          "Audit Trail",
-  admin:          "Admin",
-  settings:       "Settings",
-  help:           "Help",
+  dashboard:        "Dashboard",
+  cases:            "Cases",
+  hitl:             "Review Queue",
+  investigations:   "Investigations",
+  "ml-admin":       "ML Admin",
+  "ml-performance": "Model Performance",
+  network:          "Network / Rings",
+  analytics:        "Analytics",
+  quality:          "Data Quality",
+  audit:            "Audit Trail",
+  admin:            "User Management",
+  settings:         "Settings",
+  help:             "Help",
+  "risk-register":  "Risk Register",
+  unauthorized:     "Unauthorized",
 };
 
 export function DynamicBreadcrumb() {

@@ -27,6 +27,8 @@ import {
   LifeBuoyIcon,
   SearchIcon,
   UsersIcon,
+  TrendingUpIcon,
+  NetworkIcon,
 } from "lucide-react";
 
 const data = {
@@ -36,6 +38,8 @@ const data = {
     { title: "Review Queue",    url: "/hitl",            icon: <ClipboardListIcon /> },
     { title: "Investigations",  url: "/investigations",  icon: <SearchIcon /> },
     { title: "ML Admin",        url: "/ml-admin",        icon: <BrainCircuitIcon /> },
+    { title: "Model Performance", url: "/ml-performance", icon: <TrendingUpIcon /> },
+    { title: "Network / Rings", url: "/network",         icon: <NetworkIcon /> },
     { title: "Analytics",       url: "/analytics",       icon: <BarChart3Icon /> },
     { title: "Data Quality",    url: "/quality",         icon: <DatabaseZapIcon /> },
     { title: "Audit Trail",     url: "/audit",           icon: <ScrollTextIcon /> },

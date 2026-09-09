@@ -134,3 +134,4 @@ credentials
 REFERENCE/
 REFERENCE*/
 *.zip
+!claimgaurd-frontend/lib/

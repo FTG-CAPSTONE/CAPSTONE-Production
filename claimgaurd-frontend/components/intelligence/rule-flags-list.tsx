@@ -28,7 +28,7 @@ function RuleRow({ rule }: { rule: RuleResult }) {
         : "border-amber-200 bg-amber-50/50 dark:border-amber-900/30 dark:bg-amber-950/10",
     )}>
       <div className="flex items-start gap-2">
-        <RuleIcon result={rule.passed ?? rule.result ?? ""} severity={rule.severity} />
+        <RuleIcon result={rule.passed ?? rule.result ?? ""} severity={rule.severity ?? "info"} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium font-mono">
@@ -46,7 +46,7 @@ function RuleRow({ rule }: { rule: RuleResult }) {
             )}
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {rule.message ?? rule.description}
+            {rule.message ?? rule.description ?? ""}
           </p>
           {hasDetail && (
             <>

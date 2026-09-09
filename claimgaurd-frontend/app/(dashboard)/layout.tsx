@@ -8,6 +8,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { QueryProvider } from "@/lib/query-provider";
+import { Toaster } from "sonner";
 
 export default function DashboardLayout({
   children,
@@ -35,6 +36,7 @@ export default function DashboardLayout({
           <main className="flex flex-1 flex-col gap-4 p-6">{children}</main>
         </SidebarInset>
       </SidebarProvider>
+      <Toaster richColors position="top-right" />
     </QueryProvider>
   );
 }

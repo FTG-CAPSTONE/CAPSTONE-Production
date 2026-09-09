@@ -2,7 +2,9 @@
 
 import axios from "axios";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+// All /api/* requests are proxied to the backend via next.config.ts rewrites.
+// In development without the proxy (direct backend), set NEXT_PUBLIC_API_BASE_URL.
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export const apiClient = axios.create({ baseURL: BASE_URL });
 

@@ -64,7 +64,7 @@ export default function DashboardPage() {
       (await apiClient.get<AnalyticsOverview>("/api/analytics/overview")).data,
   });
 
-  const avgScore = data?.average_fraud_score ?? data?.avg_fraud_score;
+  const avgScore = (data?.average_fraud_score ?? data?.avg_fraud_score) ?? null;
   const trendData = mockTrend(avgScore);
 
   const statusData = data

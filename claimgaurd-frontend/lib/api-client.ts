@@ -25,7 +25,10 @@ export function getToken(): string | null {
 }
 
 export function clearToken() {
-  if (typeof window !== "undefined") sessionStorage.removeItem("claimguard_token");
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem("claimguard_token");
+    document.cookie = "cg_session=; path=/; max-age=0; SameSite=Strict";
+  }
 }
 
 apiClient.interceptors.request.use((config) => {

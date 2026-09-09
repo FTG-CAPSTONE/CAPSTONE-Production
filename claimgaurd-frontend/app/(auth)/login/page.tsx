@@ -62,6 +62,8 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
       setToken(data.access_token);
+      // Set a lightweight session cookie so proxy.ts can gate dashboard routes
+      document.cookie = `cg_session=1; path=/; SameSite=Strict`;
       setIsSuccess(true);
       setTimeout(() => router.push("/dashboard"), 600);
     } catch {

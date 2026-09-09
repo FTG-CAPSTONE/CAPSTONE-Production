@@ -263,16 +263,14 @@ export default function CaseDetailPage() {
                       </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
-        <Button asChild variant="outline" size="sm">
-          <a href={doc.download_url} target="_blank" rel="noreferrer">
-            View
-          </a>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <a href={doc.download_url} download>
-            <DownloadIcon className="size-3.5" />
-          </a>
-        </Button>
+                      <a href={doc.download_url} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center rounded-lg border border-input bg-background px-2.5 h-7 text-xs font-medium hover:bg-muted transition-colors">
+                        View
+                      </a>
+                      <a href={doc.download_url} download
+                        className="inline-flex items-center rounded-lg px-2 h-7 text-xs text-muted-foreground hover:bg-muted transition-colors">
+                        <DownloadIcon className="size-3.5" />
+                      </a>
                     </div>
                   </div>
                 ))}

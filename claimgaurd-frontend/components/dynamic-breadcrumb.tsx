@@ -20,9 +20,11 @@ const labelMap: Record<string, string> = {
   analytics:      "Analytics",
   quality:        "Data Quality",
   audit:          "Audit Trail",
-  admin:          "Admin",
+  admin:          "User Management",
   settings:       "Settings",
   help:           "Help",
+  "risk-register":"Risk Register",
+  unauthorized:   "Unauthorized",
 };
 
 export function DynamicBreadcrumb() {

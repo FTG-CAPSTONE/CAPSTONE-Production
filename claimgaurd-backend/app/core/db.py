@@ -70,21 +70,22 @@ async def get_async_db() -> AsyncSession:  # type: ignore[return]
 
 async def init_db() -> None:
     """
-    Create all tables from metadata.
-    Used in development only — production uses Alembic migrations.
+    Create all tables from metadata (idempotent — safe in dev and prod),
+    then seed default roles and admin account.
+    Production uses Alembic for schema migrations, but create_all is kept
+    as a safety net for fresh deployments where migrations haven't run.
     """
-    if settings.is_development:
-        async with async_engine.begin() as conn:
-            # Import all models to ensure they are registered on Base.metadata
-            import app.users.models  # noqa: F401
-            import app.cases.models  # noqa: F401
-            import app.ingestion.models  # noqa: F401
-            import app.rules.models  # noqa: F401
-            import app.ml.models  # noqa: F401
-            import app.hitl.models  # noqa: F401
-            import app.quality.models  # noqa: F401
+    async with async_engine.begin() as conn:
+        # Import all models to ensure they are registered on Base.metadata
+        import app.users.models  # noqa: F401
+        import app.cases.models  # noqa: F401
+        import app.ingestion.models  # noqa: F401
+        import app.rules.models  # noqa: F401
+        import app.ml.models  # noqa: F401
+        import app.hitl.models  # noqa: F401
+        import app.quality.models  # noqa: F401
 
-            await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all)
 
     await _seed_roles_and_admin()
 

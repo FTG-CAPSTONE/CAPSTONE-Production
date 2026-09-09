@@ -27,6 +27,9 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    # Suppress CPendingDeprecationWarning — retain retry-on-startup behaviour
+    # explicitly rather than relying on the deprecated broker_connection_retry.
+    broker_connection_retry_on_startup=True,
     task_routes={
         "app.etl.*":           {"queue": "etl"},
         "app.ml.*":            {"queue": "ml"},

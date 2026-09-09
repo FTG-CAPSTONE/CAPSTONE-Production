@@ -137,10 +137,10 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" render={<Link href="/hitl" />}>Review Queue →</Button>
-        <Button variant="outline" size="sm" render={<Link href="/cases" />}>All Cases</Button>
-        <Button variant="outline" size="sm" render={<Link href="/analytics" />}>Analytics</Button>
-        <Button variant="outline" size="sm" render={<Link href="/ml-admin" />}>ML Admin</Button>
+        <Button size="sm" nativeButton={false} render={<Link href="/hitl" />}>Review Queue →</Button>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/cases" />}>All Cases</Button>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/analytics" />}>Analytics</Button>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/ml-admin" />}>ML Admin</Button>
       </div>
 
       {/* Charts row */}

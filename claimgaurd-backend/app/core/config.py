@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     # ── Dev Seed ───────────────────────────────────────────
     ENABLE_DEV_SEED_ENDPOINT: bool = True
 
+    # ── Default admin account (seeded on first startup) ───
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "admin1234"
+    ADMIN_FULL_NAME: str = "ClaimGuard Admin"
+    ADMIN_EMAIL: str = "admin@claimguard.co.ke"
+
     # ── Notifications ──────────────────────────────────────
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

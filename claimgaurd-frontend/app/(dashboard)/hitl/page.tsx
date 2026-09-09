@@ -164,7 +164,12 @@ export default function HitlPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm" render={<Link href={`/cases/${item.case_id}`} />}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      nativeButton={false}
+                      render={<Link href={`/cases/${item.case_id}`} />}
+                    >
                       Review →
                     </Button>
                   </TableCell>

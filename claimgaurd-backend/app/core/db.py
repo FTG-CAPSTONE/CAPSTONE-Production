@@ -85,3 +85,75 @@ async def init_db() -> None:
             import app.quality.models  # noqa: F401
 
             await conn.run_sync(Base.metadata.create_all)
+
+    await _seed_roles_and_admin()
+
+
+# ── Idempotent seed helpers ────────────────────────────────────────────────────
+
+_ALL_ROLES = [
+    ("admin",          "Full platform access"),
+    ("underwriter",    "Underwriting workflow access"),
+    ("adjuster",       "Claims adjustment workflow access"),
+    ("investigator",   "Investigation workspace access"),
+    ("ml_admin",       "ML model governance access"),
+    ("compliance",     "Compliance and audit access"),
+    ("corporate_risk", "Corporate risk register access"),
+    ("viewer",         "Read-only access"),
+]
+
+
+async def _seed_roles_and_admin() -> None:
+    """
+    Ensure all roles exist and the default admin account is present.
+    Safe to call on every startup — skips if already seeded.
+    """
+    import structlog
+    from sqlalchemy import select
+
+    from app.core.security import hash_password
+    from app.users.models import AppRole, AppUser
+
+    log = structlog.get_logger()
+
+    async with AsyncSessionLocal() as session:
+        # ── 1. Seed roles ────────────────────────────────────────────────────
+        for role_name, description in _ALL_ROLES:
+            existing = await session.execute(
+                select(AppRole).where(AppRole.name == role_name)
+            )
+            if existing.scalar_one_or_none() is None:
+                session.add(AppRole(name=role_name, description=description))
+                log.info("claimguard.seed.role.created", role=role_name)
+
+        await session.flush()
+
+        # ── 2. Seed default admin ────────────────────────────────────────────
+        existing_admin = await session.execute(
+            select(AppUser).where(AppUser.username == settings.ADMIN_USERNAME.lower())
+        )
+        if existing_admin.scalar_one_or_none() is None:
+            admin_role = await session.execute(
+                select(AppRole).where(AppRole.name == "admin")
+            )
+            admin_role_obj = admin_role.scalar_one_or_none()
+
+            session.add(AppUser(
+                username=settings.ADMIN_USERNAME.lower(),
+                full_name=settings.ADMIN_FULL_NAME,
+                email=settings.ADMIN_EMAIL,
+                hashed_password=hash_password(settings.ADMIN_PASSWORD),
+                role_id=admin_role_obj.id if admin_role_obj else None,
+                is_active=True,
+            ))
+            log.info(
+                "claimguard.seed.admin.created",
+                username=settings.ADMIN_USERNAME,
+            )
+        else:
+            log.info(
+                "claimguard.seed.admin.exists",
+                username=settings.ADMIN_USERNAME,
+            )
+
+        await session.commit()

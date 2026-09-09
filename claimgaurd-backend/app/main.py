@@ -84,6 +84,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.is_development:
         await init_db()
         logger.info("claimguard.db.ready")
+    else:
+        # Production: tables exist via Alembic, but still seed roles + admin
+        from app.core.db import _seed_roles_and_admin
+        await _seed_roles_and_admin()
+        logger.info("claimguard.db.seed.done")
 
     yield
 

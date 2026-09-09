@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -179,9 +180,8 @@ export default function CasesPage() {
               {paged.map((c) => {
                 const isExpanded = expandedId === c.id;
                 return (
-                  <>
+                  <React.Fragment key={c.id}>
                     <TableRow
-                      key={c.id}
                       className="cursor-pointer group"
                       onClick={() => setExpandedId(isExpanded ? null : c.id)}
                     >
@@ -253,7 +253,7 @@ export default function CasesPage() {
                         </tr>
                       )}
                     </AnimatePresence>
-                  </>
+                  </React.Fragment>
                 );
               })}
             </TableBody>

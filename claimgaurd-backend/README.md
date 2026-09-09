@@ -6,25 +6,130 @@ Python/FastAPI backend for the ClaimGuard claims intelligence platform.
 
 ---
 
-## Start
+## Running Locally
+
+### Prerequisites
+
+| Tool | Version | Install |
+|------|---------|---------|
+| Python | 3.12 | system or pyenv |
+| uv | latest | `pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| PostgreSQL | 16 | running locally (`pg_isready` should return OK) |
+| Redis | 7 | running locally (`redis-cli ping` should return PONG) |
+
+### First-time setup
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 cd claimgaurd-backend
 
-# First time only
+# 1. Create virtual environment (Python 3.12)
 uv venv --python 3.12
-uv pip install -r requirements.txt
-cp .env.example .env
-alembic upgrade head
 
-# Start the API server
+# 2. Install all dependencies
+uv pip install -r requirements.txt
+
+# 3. Create the database and user (run once as postgres superuser)
+psql -U postgres -c "CREATE USER claimguard WITH ENCRYPTED PASSWORD 'cg_secure_2026';"
+psql -U postgres -c "CREATE DATABASE claimguard OWNER claimguard;"
+
+# 4. Copy the dev environment file
+cp .env.example .env
+# .env already has the correct local defaults — no edits needed for dev
+
+# 5. Run Alembic migrations (creates all 22 tables)
+.venv/bin/alembic upgrade head
+```
+
+### Start the API server
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+cd claimgaurd-backend
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-- API: **http://localhost:8000**
-- Swagger docs: **http://localhost:8000/docs**
-- Health check: `GET /health`
+| URL | Purpose |
+|-----|---------|
+| http://localhost:8000 | API root |
+| http://localhost:8000/docs | Swagger UI (interactive) |
+| http://localhost:8000/redoc | ReDoc reference |
+| http://localhost:8000/health | Health check |
+| http://localhost:8000/metrics | Prometheus metrics |
+
+### Start Celery (optional — needed for background ETL/ML jobs)
+
+Open two additional terminals from the `claimgaurd-backend/` directory:
+
+```bash
+# Terminal 2 — Celery worker
+export PATH="$HOME/.local/bin:$PATH"
+.venv/bin/celery -A workers.celery_app worker \
+  --loglevel=info \
+  -Q default,etl,ml,notifications \
+  --concurrency=2
+```
+
+```bash
+# Terminal 3 — Celery beat scheduler
+export PATH="$HOME/.local/bin:$PATH"
+.venv/bin/celery -A workers.celery_app beat --loglevel=info
+```
+
+> **Without Celery:** ETL can be triggered synchronously via `POST /api/ingestion/batch/process-pending` — no background workers needed for basic dev.
+
+### Start MinIO (optional — needed for document uploads only)
+
+```bash
+docker run -d --name claimguard-minio \
+  -p 9000:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin \
+  -e MINIO_ROOT_PASSWORD=minioadmin \
+  minio/minio server /data --console-address ":9001"
+```
+
+MinIO console: http://localhost:9001 (minioadmin / minioadmin). Leave this out if you don't need document storage — the rest of the app works fine without it.
+
+### Seed dev data
+
+With the API running:
+
+```bash
+# Create 100 synthetic Kenya motor insurance claims
+curl -s -X POST http://localhost:8000/api/ingestion/dev/seed \
+  -H "Content-Type: application/json" \
+  -d '{"count": 100}' | python3 -m json.tool
+
+# Run ETL pipeline on all pending intakes
+curl -s -X POST http://localhost:8000/api/ingestion/batch/process-pending | python3 -m json.tool
+```
+
+This populates cases, rule evaluations, ML predictions, and the HITL queue so the frontend has data to show.
+
+### Create your first user
+
+```bash
+curl -s -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "full_name": "Admin User", "email": "admin@local.dev", "password": "Admin@1234", "role": "admin"}' \
+  | python3 -m json.tool
+```
+
+Then log in via `POST /api/auth/login` (OAuth2 form data) or directly from the frontend at http://localhost:3000/login.
+
+### Full Docker stack (alternative)
+
+Runs API + Celery + PostgreSQL + Redis + MinIO all together:
+
+```bash
+cd claimgaurd-backend/docker
+docker compose up -d          # starts everything
+docker compose logs -f api    # watch API logs
+docker compose down           # stop (data preserved)
+docker compose down -v        # stop and wipe all data
+```
+
+The `docker-compose.yml` also runs `alembic upgrade head` automatically before starting the API.
 
 ---
 

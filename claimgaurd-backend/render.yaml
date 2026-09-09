@@ -37,10 +37,9 @@ services:
 
     rootDir: .          # repo root IS the backend (see Step 1 in the guide)
     buildCommand: pip install -r requirements.txt
-    # honcho runs uvicorn + celery worker + celery beat in one container
-    # This avoids needing a paid Background Worker service on Render.
-    # Switch back to bare uvicorn + separate worker service when upgrading to paid.
-    startCommand: honcho start -f Procfile.render
+    # start.py is a zero-dependency multi-process launcher (replaces honcho)
+    # It runs uvicorn + celery worker + celery beat in one free-tier container.
+    startCommand: python start.py
     healthCheckPath: /health
 
     envVars:

@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, text
 
 from app.cases.models import Case, Party, Policy, Vehicle
 from app.core.deps import CurrentUser, DBSession
@@ -127,141 +127,148 @@ async def list_rings(
     rings: List[RingSummary] = []
 
     # ── 1. Provider rings ─────────────────────────────────────────────────────
-    provider_rows = await db.execute(
-        select(
-            Party.id.label("provider_id"),
-            Party.full_name.label("provider_name"),
-            func.count(Case.id).label("case_count"),
-            func.sum(Case.amount_claimed).label("total_amount"),
-            func.avg(Case.fraud_score).label("avg_score"),
-            func.count(
-                Case.id
-            ).filter(
-                or_(
-                    Case.fraud_score >= str(fraud_threshold),
-                    Case.status.in_(["auto_rejected", "declined"]),
-                )
-            ).label("flagged_count"),
-            func.min(Case.submitted_at).label("first_seen"),
-            func.max(Case.submitted_at).label("last_seen"),
-            func.array_agg(Case.id).label("case_ids"),
-        )
-        .join(Party, Case.provider_id == Party.id)
-        .where(Case.submitted_at >= since)
-        .where(Party.party_type == "provider")
-        .group_by(Party.id, Party.full_name)
-        .having(func.count(Case.id) >= min_cases)
-        .order_by(func.avg(Case.fraud_score).desc().nullslast())
-    )
+    provider_sql = text("""
+        SELECT
+            p.id                        AS provider_id,
+            p.full_name                 AS provider_name,
+            COUNT(c.id)                 AS case_count,
+            COALESCE(SUM(c.amount_claimed), 0)  AS total_amount,
+            AVG(c.fraud_score::float)   AS avg_score,
+            COUNT(c.id) FILTER (
+                WHERE c.fraud_score::float >= :threshold
+                   OR c.status IN ('auto_rejected','declined')
+            )                           AS flagged_count,
+            MIN(c.submitted_at)         AS first_seen,
+            MAX(c.submitted_at)         AS last_seen,
+            ARRAY_AGG(c.id::text)       AS case_ids
+        FROM "case" c
+        JOIN party p ON c.provider_id = p.id
+        WHERE c.submitted_at >= :since
+          AND p.party_type = 'provider'
+        GROUP BY p.id, p.full_name
+        HAVING COUNT(c.id) >= :min_cases
+        ORDER BY AVG(c.fraud_score::float) DESC NULLS LAST
+    """)
+    provider_rows = (await db.execute(
+        provider_sql,
+        {"since": since, "threshold": fraud_threshold, "min_cases": min_cases}
+    )).mappings().all()
 
-    for row in provider_rows.all():
-        case_ids = [str(c) for c in (row.case_ids or [])]
-        flagged = int(row.flagged_count or 0)
-        if flagged == 0 and row.case_count < 5:
-            continue  # skip clean small clusters
-        avg_s = float(row.avg_score) if row.avg_score else None
+    for row in provider_rows:
+        case_ids = list(row["case_ids"] or [])
+        flagged = int(row["flagged_count"] or 0)
+        if flagged == 0 and row["case_count"] < 5:
+            continue
+        avg_s = float(row["avg_score"]) if row["avg_score"] is not None else None
         rings.append(RingSummary(
-            ring_id=f"provider-{row.provider_id}",
+            ring_id=f"provider-{row['provider_id']}",
             ring_type="provider_ring",
-            case_count=int(row.case_count),
+            case_count=int(row["case_count"]),
             flagged_count=flagged,
-            total_amount_kes=round(float(row.total_amount or 0), 2),
-            avg_fraud_score=round(avg_s, 3) if avg_s else None,
-            risk_level=_risk_level(flagged, int(row.case_count), avg_s),
-            hub_label=row.provider_name,
+            total_amount_kes=round(float(row["total_amount"]), 2),
+            avg_fraud_score=round(avg_s, 3) if avg_s is not None else None,
+            risk_level=_risk_level(flagged, int(row["case_count"]), avg_s),
+            hub_label=row["provider_name"],
             hub_type="provider",
             case_ids=case_ids,
-            first_seen=row.first_seen.strftime("%Y-%m-%d") if row.first_seen else None,
-            last_seen=row.last_seen.strftime("%Y-%m-%d") if row.last_seen else None,
+            first_seen=row["first_seen"].strftime("%Y-%m-%d") if row["first_seen"] else None,
+            last_seen=row["last_seen"].strftime("%Y-%m-%d") if row["last_seen"] else None,
         ))
 
     # ── 2. Claimant rings (same party appears in multiple claims) ─────────────
-    claimant_rows = await db.execute(
-        select(
-            Party.id.label("claimant_id"),
-            Party.full_name.label("claimant_name"),
-            Party.phone.label("phone"),
-            func.count(Case.id).label("case_count"),
-            func.sum(Case.amount_claimed).label("total_amount"),
-            func.avg(Case.fraud_score).label("avg_score"),
-            func.min(Case.submitted_at).label("first_seen"),
-            func.max(Case.submitted_at).label("last_seen"),
-            func.array_agg(Case.id).label("case_ids"),
-        )
-        .join(Party, Case.claimant_id == Party.id)
-        .where(Case.submitted_at >= since)
-        .group_by(Party.id, Party.full_name, Party.phone)
-        .having(func.count(Case.id) >= min_cases)
-        .order_by(func.count(Case.id).desc())
-    )
+    claimant_sql = text("""
+        SELECT
+            p.id                        AS claimant_id,
+            p.full_name                 AS claimant_name,
+            p.phone                     AS phone,
+            COUNT(c.id)                 AS case_count,
+            COALESCE(SUM(c.amount_claimed), 0)  AS total_amount,
+            AVG(c.fraud_score::float)   AS avg_score,
+            MIN(c.submitted_at)         AS first_seen,
+            MAX(c.submitted_at)         AS last_seen,
+            ARRAY_AGG(c.id::text)       AS case_ids
+        FROM "case" c
+        JOIN party p ON c.claimant_id = p.id
+        WHERE c.submitted_at >= :since
+        GROUP BY p.id, p.full_name, p.phone
+        HAVING COUNT(c.id) >= :min_cases
+        ORDER BY COUNT(c.id) DESC
+    """)
+    claimant_rows = (await db.execute(
+        claimant_sql,
+        {"since": since, "min_cases": min_cases}
+    )).mappings().all()
 
-    for row in claimant_rows.all():
-        case_ids = [str(c) for c in (row.case_ids or [])]
-        # For claimant rings, flag based on fraud_score directly
+    for row in claimant_rows:
+        case_ids = list(row["case_ids"] or [])
+        avg_s = float(row["avg_score"]) if row["avg_score"] is not None else None
         flagged = 0
-        if row.avg_score and float(row.avg_score) >= fraud_threshold:
-            flagged = max(1, int(row.case_count * float(row.avg_score)))
-        if flagged == 0 and row.case_count < 4:
+        if avg_s and avg_s >= fraud_threshold:
+            flagged = max(1, int(row["case_count"] * avg_s))
+        if flagged == 0 and row["case_count"] < 4:
             continue
-        avg_s = float(row.avg_score) if row.avg_score else None
         rings.append(RingSummary(
-            ring_id=f"claimant-{row.claimant_id}",
+            ring_id=f"claimant-{row['claimant_id']}",
             ring_type="claimant_ring",
-            case_count=int(row.case_count),
-            flagged_count=min(flagged, int(row.case_count)),
-            total_amount_kes=round(float(row.total_amount or 0), 2),
-            avg_fraud_score=round(avg_s, 3) if avg_s else None,
-            risk_level=_risk_level(flagged, int(row.case_count), avg_s),
-            hub_label=f"{row.claimant_name}" + (f" · {row.phone}" if row.phone else ""),
+            case_count=int(row["case_count"]),
+            flagged_count=min(flagged, int(row["case_count"])),
+            total_amount_kes=round(float(row["total_amount"]), 2),
+            avg_fraud_score=round(avg_s, 3) if avg_s is not None else None,
+            risk_level=_risk_level(flagged, int(row["case_count"]), avg_s),
+            hub_label=row["claimant_name"] + (f" · {row['phone']}" if row["phone"] else ""),
             hub_type="claimant",
             case_ids=case_ids,
-            first_seen=row.first_seen.strftime("%Y-%m-%d") if row.first_seen else None,
-            last_seen=row.last_seen.strftime("%Y-%m-%d") if row.last_seen else None,
+            first_seen=row["first_seen"].strftime("%Y-%m-%d") if row["first_seen"] else None,
+            last_seen=row["last_seen"].strftime("%Y-%m-%d") if row["last_seen"] else None,
         ))
 
     # ── 3. Vehicle rings (same vehicle in multiple claims) ────────────────────
-    vehicle_rows = await db.execute(
-        select(
-            Vehicle.id.label("vehicle_id"),
-            Vehicle.registration.label("registration"),
-            Vehicle.make.label("make"),
-            Vehicle.model.label("model_name"),
-            func.count(Case.id).label("case_count"),
-            func.sum(Case.amount_claimed).label("total_amount"),
-            func.avg(Case.fraud_score).label("avg_score"),
-            func.min(Case.submitted_at).label("first_seen"),
-            func.max(Case.submitted_at).label("last_seen"),
-            func.array_agg(Case.id).label("case_ids"),
-        )
-        .join(Policy, Case.policy_id == Policy.id)
-        .join(Vehicle, Policy.vehicle_id == Vehicle.id)
-        .where(Case.submitted_at >= since)
-        .where(Vehicle.registration.isnot(None))
-        .group_by(Vehicle.id, Vehicle.registration, Vehicle.make, Vehicle.model)
-        .having(func.count(Case.id) >= min_cases)
-        .order_by(func.count(Case.id).desc())
-    )
+    vehicle_sql = text("""
+        SELECT
+            v.id                        AS vehicle_id,
+            v.registration              AS registration,
+            v.make                      AS make,
+            v.model                     AS model_name,
+            COUNT(c.id)                 AS case_count,
+            COALESCE(SUM(c.amount_claimed), 0)  AS total_amount,
+            AVG(c.fraud_score::float)   AS avg_score,
+            MIN(c.submitted_at)         AS first_seen,
+            MAX(c.submitted_at)         AS last_seen,
+            ARRAY_AGG(c.id::text)       AS case_ids
+        FROM "case" c
+        JOIN policy pol ON c.policy_id = pol.id
+        JOIN vehicle v   ON pol.vehicle_id = v.id
+        WHERE c.submitted_at >= :since
+          AND v.registration IS NOT NULL
+        GROUP BY v.id, v.registration, v.make, v.model
+        HAVING COUNT(c.id) >= :min_cases
+        ORDER BY COUNT(c.id) DESC
+    """)
+    vehicle_rows = (await db.execute(
+        vehicle_sql,
+        {"since": since, "min_cases": min_cases}
+    )).mappings().all()
 
-    for row in vehicle_rows.all():
-        case_ids = [str(c) for c in (row.case_ids or [])]
-        avg_s = float(row.avg_score) if row.avg_score else None
-        flagged = max(1, int((row.case_count - 1)))  # >1 claim on same vehicle is inherently flagged
-        label = row.registration or "Unknown reg"
-        if row.make:
-            label += f" ({row.make} {row.model_name or ''})"
+    for row in vehicle_rows:
+        case_ids = list(row["case_ids"] or [])
+        avg_s = float(row["avg_score"]) if row["avg_score"] is not None else None
+        flagged = max(1, int(row["case_count"]) - 1)
+        label = row["registration"] or "Unknown reg"
+        if row["make"]:
+            label += f" ({row['make']} {row['model_name'] or ''})"
         rings.append(RingSummary(
-            ring_id=f"vehicle-{row.vehicle_id}",
+            ring_id=f"vehicle-{row['vehicle_id']}",
             ring_type="vehicle_ring",
-            case_count=int(row.case_count),
+            case_count=int(row["case_count"]),
             flagged_count=flagged,
-            total_amount_kes=round(float(row.total_amount or 0), 2),
-            avg_fraud_score=round(avg_s, 3) if avg_s else None,
-            risk_level=_risk_level(flagged, int(row.case_count), avg_s),
+            total_amount_kes=round(float(row["total_amount"]), 2),
+            avg_fraud_score=round(avg_s, 3) if avg_s is not None else None,
+            risk_level=_risk_level(flagged, int(row["case_count"]), avg_s),
             hub_label=label.strip(),
             hub_type="vehicle",
             case_ids=case_ids,
-            first_seen=row.first_seen.strftime("%Y-%m-%d") if row.first_seen else None,
-            last_seen=row.last_seen.strftime("%Y-%m-%d") if row.last_seen else None,
+            first_seen=row["first_seen"].strftime("%Y-%m-%d") if row["first_seen"] else None,
+            last_seen=row["last_seen"].strftime("%Y-%m-%d") if row["last_seen"] else None,
         ))
 
     # Sort by risk level then total amount

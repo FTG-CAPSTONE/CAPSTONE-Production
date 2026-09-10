@@ -2,97 +2,92 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SearchIcon, FilterXIcon } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import type { AuditEvent } from "@/lib/types";
-import { AuditTimeline } from "@/components/intelligence/audit-timeline";
-import { TableSkeleton } from "@/components/shared/loading-skeleton";
-import { Button } from "@/components/ui/button";
-import { EVENT_LABELS } from "@/lib/constants";
-
-const EVENT_TYPES = [
-  "case_ingested", "etl_completed", "rules_evaluated", "ml_scored",
-  "routed_to_hitl", "auto_approved", "auto_rejected",
-  "case_opened", "decision_recorded", "investigation_opened",
-  "document_uploaded",
-];
 
 export default function AuditPage() {
-  const [caseId, setCaseId]     = useState("");
-  const [actor, setActor]       = useState("");
-  const [eventType, setEventType] = useState("");
+  const [caseIdInput, setCaseIdInput] = useState("");
+  const [caseIdFilter, setCaseIdFilter] = useState("");
 
-  const params = Object.fromEntries(
-    Object.entries({ case_id: caseId, actor, event_type: eventType })
-      .filter(([, v]) => v.trim() !== ""),
-  );
-
-  const { data, isLoading } = useQuery<AuditEvent[]>({
-    queryKey: ["audit", params],
-    queryFn: async () =>
-      (await apiClient.get<AuditEvent[]>("/api/audit", { params })).data,
+  const { data, isLoading } = useQuery({
+    queryKey: ["audit-events", caseIdFilter],
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (caseIdFilter.trim()) params.case_id = caseIdFilter.trim();
+      // Correct endpoint: /api/audit  (not /api/audit/events)
+      return (await apiClient.get<AuditEvent[]>("/api/audit", { params })).data;
+    },
   });
 
-  const hasFilters = !!(caseId || actor || eventType);
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Audit Trail</h1>
-        <span className="text-xs text-muted-foreground">
-          {data?.length ?? 0} events
-        </span>
-      </div>
-      <p className="text-sm text-muted-foreground -mt-2">
-        Immutable log of all system and reviewer actions.
+    <div>
+      <h1 className="mb-1 text-2xl font-semibold">Audit Trail</h1>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Immutable log of all system and user actions.
       </p>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <div className="relative">
-          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <input
-            className="h-8 rounded-lg border border-input bg-background pl-8 pr-3 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-ring"
-            placeholder="Case ID…"
-            value={caseId}
-            onChange={(e) => setCaseId(e.target.value)}
-          />
-        </div>
+      {/* Filter bar */}
+      <div className="mb-4 flex items-center gap-2">
         <input
-          className="h-8 rounded-lg border border-input bg-background px-3 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder="Actor…"
-          value={actor}
-          onChange={(e) => setActor(e.target.value)}
+          type="text"
+          placeholder="Filter by Case ID (optional)"
+          value={caseIdInput}
+          onChange={(e) => setCaseIdInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && setCaseIdFilter(caseIdInput)}
+          className="w-72 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <select
-          value={eventType}
-          onChange={(e) => setEventType(e.target.value)}
-          className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        <button
+          onClick={() => setCaseIdFilter(caseIdInput)}
+          className="rounded-md bg-blue-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-800"
         >
-          <option value="">All event types</option>
-          {EVENT_TYPES.map((t) => (
-            <option key={t} value={t}>{EVENT_LABELS[t] ?? t.replace(/_/g, " ")}</option>
-          ))}
-        </select>
-        {hasFilters && (
-          <Button
-            variant="ghost" size="sm"
-            onClick={() => { setCaseId(""); setActor(""); setEventType(""); }}
+          Search
+        </button>
+        {caseIdFilter && (
+          <button
+            onClick={() => { setCaseIdInput(""); setCaseIdFilter(""); }}
+            className="text-sm text-slate-500 hover:text-slate-800"
           >
-            <FilterXIcon className="size-3.5 mr-1" />
             Clear
-          </Button>
+          </button>
         )}
       </div>
 
-      {/* Timeline */}
-      {isLoading ? (
-        <TableSkeleton rows={6} cols={3} />
-      ) : (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <AuditTimeline events={data ?? []} />
-        </div>
-      )}
+      <div className="rounded-xl border border-border bg-card">
+        {isLoading ? (
+          <p className="p-6 text-sm text-muted-foreground">Loading…</p>
+        ) : !data?.length ? (
+          <p className="p-6 text-sm text-muted-foreground">
+            {caseIdFilter ? `No events for case ${caseIdFilter}.` : "No audit events found."}
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-4 py-3">Event</th>
+                <th className="px-4 py-3">Actor</th>
+                <th className="px-4 py-3">Case</th>
+                <th className="px-4 py-3 text-right">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((e) => (
+                <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                  <td className="px-4 py-3 font-medium capitalize">
+                    {e.event_type?.replace(/_/g, " ") ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{e.actor ?? "system"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                    {e.case_id?.slice(0, 8) ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">
+                    {e.occurred_at ? new Date(e.occurred_at).toLocaleString() : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

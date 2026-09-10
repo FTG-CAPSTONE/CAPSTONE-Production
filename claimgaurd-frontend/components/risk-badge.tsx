@@ -1,21 +1,51 @@
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { FraudBand } from "@/lib/types";
 
-// Backend returns lowercase band values: low | medium | high | critical
-const STYLES: Record<FraudBand, string> = {
-  low:      "bg-emerald-100 text-emerald-800 border-emerald-300",
-  medium:   "bg-amber-100 text-amber-800 border-amber-300",
-  high:     "bg-orange-100 text-orange-800 border-orange-300",
-  critical: "bg-red-100 text-red-800 border-red-300",
+const bandConfig: Record<FraudBand, { label: string; className: string }> = {
+  low: {
+    label: "Low",
+    className: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800",
+  },
+  medium: {
+    label: "Medium",
+    className: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
+  },
+  high: {
+    label: "High",
+    className: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800",
+  },
+  critical: {
+    label: "Critical",
+    className: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800",
+  },
 };
 
-export function RiskBadge({ band }: { band: FraudBand }) {
+interface RiskBadgeProps {
+  band: FraudBand | null | undefined;
+  score?: string | number | null;
+  showScore?: boolean;
+  className?: string;
+}
+
+export function RiskBadge({ band, score, showScore = false, className }: RiskBadgeProps) {
+  if (!band) return <span className="text-muted-foreground">—</span>;
+  
+  const config = bandConfig[band] ?? {
+    label: band,
+    className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  };
+
+  const displayText = showScore && score != null
+    ? `${parseFloat(String(score)).toFixed(0)} (${config.label})`
+    : config.label;
+
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${
-        STYLES[band] ?? "bg-slate-100 text-slate-600"
-      }`}
+    <Badge
+      variant="outline"
+      className={cn("font-medium", config.className, className)}
     >
-      {band}
-    </span>
+      {displayText}
+    </Badge>
   );
 }

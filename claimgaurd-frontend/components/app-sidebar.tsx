@@ -18,7 +18,6 @@ import {
   LayoutDashboardIcon,
   FolderOpenIcon,
   ClipboardListIcon,
-  SearchIcon,
   BrainCircuitIcon,
   BarChart3Icon,
   DatabaseZapIcon,
@@ -26,31 +25,27 @@ import {
   ShieldCheckIcon,
   SettingsIcon,
   LifeBuoyIcon,
+  SearchIcon,
   UsersIcon,
-  BuildingIcon,
+  TrendingUpIcon,
+  NetworkIcon,
 } from "lucide-react";
 
 const data = {
-  user: {
-    name: "ClaimGuard User",
-    email: "admin@claimguard.co.ke",
-    initials: "CG",
-  },
   navMain: [
-    { title: "Dashboard",    url: "/dashboard",       icon: <LayoutDashboardIcon /> },
-    { title: "Cases",        url: "/cases",            icon: <FolderOpenIcon /> },
-    { title: "Review Queue", url: "/hitl",             icon: <ClipboardListIcon /> },
-    { title: "Investigations",url: "/investigations",  icon: <SearchIcon /> },
-    { title: "ML Admin",     url: "/ml-admin",         icon: <BrainCircuitIcon /> },
-    { title: "Analytics",    url: "/analytics",        icon: <BarChart3Icon /> },
-    { title: "Data Quality", url: "/quality",          icon: <DatabaseZapIcon /> },
-    { title: "Audit Trail",  url: "/audit",            icon: <ScrollTextIcon /> },
-    { title: "Risk Register",url: "/risk-register",    icon: <BuildingIcon /> },
-  ],
-  navAdmin: [
-    { title: "User Management", url: "/admin", icon: <UsersIcon /> },
+    { title: "Dashboard",       url: "/dashboard",       icon: <LayoutDashboardIcon /> },
+    { title: "Cases",           url: "/cases",           icon: <FolderOpenIcon /> },
+    { title: "Review Queue",    url: "/hitl",            icon: <ClipboardListIcon /> },
+    { title: "Investigations",  url: "/investigations",  icon: <SearchIcon /> },
+    { title: "ML Admin",        url: "/ml-admin",        icon: <BrainCircuitIcon /> },
+    { title: "Model Performance", url: "/ml-performance", icon: <TrendingUpIcon /> },
+    { title: "Network / Rings", url: "/network",         icon: <NetworkIcon /> },
+    { title: "Analytics",       url: "/analytics",       icon: <BarChart3Icon /> },
+    { title: "Data Quality",    url: "/quality",         icon: <DatabaseZapIcon /> },
+    { title: "Audit Trail",     url: "/audit",           icon: <ScrollTextIcon /> },
   ],
   navSecondary: [
+    { title: "Admin",    url: "/admin",    icon: <UsersIcon /> },
     { title: "Settings", url: "/settings", icon: <SettingsIcon /> },
     { title: "Help",     url: "/help",     icon: <LifeBuoyIcon /> },
   ],
@@ -69,7 +64,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">ClaimGuard</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  Claims Intelligence
+                  Claims Analytics
                 </span>
               </div>
             </SidebarMenuButton>
@@ -78,13 +73,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavMain items={data.navMain} label="Platform" />
-        <NavMain items={data.navAdmin} label="Administration" />
+        <NavMain items={data.navMain} label="Navigation" />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
 
       <SidebarFooter>
-      <NavUser />
+        <NavUser />
       </SidebarFooter>
     </Sidebar>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -12,19 +13,21 @@ import {
 } from "@/components/ui/breadcrumb";
 
 const labelMap: Record<string, string> = {
-  dashboard:      "Dashboard",
-  cases:          "Cases",
-  hitl:           "Review Queue",
-  investigations: "Investigations",
-  "ml-admin":     "ML Admin",
-  analytics:      "Analytics",
-  quality:        "Data Quality",
-  audit:          "Audit Trail",
-  admin:          "User Management",
-  settings:       "Settings",
-  help:           "Help",
-  "risk-register":"Risk Register",
-  unauthorized:   "Unauthorized",
+  dashboard:        "Dashboard",
+  cases:            "Cases",
+  hitl:             "Review Queue",
+  investigations:   "Investigations",
+  "ml-admin":       "ML Admin",
+  "ml-performance": "Model Performance",
+  network:          "Network / Rings",
+  analytics:        "Analytics",
+  quality:          "Data Quality",
+  audit:            "Audit Trail",
+  admin:            "User Management",
+  settings:         "Settings",
+  help:             "Help",
+  "risk-register":  "Risk Register",
+  unauthorized:     "Unauthorized",
 };
 
 export function DynamicBreadcrumb() {
@@ -43,13 +46,12 @@ export function DynamicBreadcrumb() {
             segment.charAt(0).toUpperCase() + segment.slice(1);
           const isLast = index === segments.length - 1;
 
+          // key must be on React.Fragment — BreadcrumbItem and BreadcrumbSeparator
+          // are both <li> siblings inside the BreadcrumbList <ol>, so they can't
+          // be wrapped in a plain <> without a key on the fragment itself.
           return (
-            // BreadcrumbItem and BreadcrumbSeparator are both <li> elements.
-            // They must be siblings inside the <ol> (BreadcrumbList),
-            // never nested inside each other.
-            <>
+            <React.Fragment key={href}>
               <BreadcrumbItem
-                key={`item-${href}`}
                 className={
                   !isLast && segments.length > 1 ? "hidden md:flex" : undefined
                 }
@@ -63,12 +65,9 @@ export function DynamicBreadcrumb() {
                 )}
               </BreadcrumbItem>
               {!isLast && (
-                <BreadcrumbSeparator
-                  key={`sep-${href}`}
-                  className="hidden md:flex"
-                />
+                <BreadcrumbSeparator className="hidden md:flex" />
               )}
-            </>
+            </React.Fragment>
           );
         })}
       </BreadcrumbList>

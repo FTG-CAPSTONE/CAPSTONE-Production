@@ -3,106 +3,84 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import type { QualitySummary } from "@/lib/types";
-import { StatCard } from "@/components/shared/stat-card";
-import { StatRowSkeleton, TableSkeleton } from "@/components/shared/loading-skeleton";
-import { CaseStatusBadge } from "@/components/cases/case-status-badge";
-import {
-  Table, TableBody, TableCell, TableHead,
-  TableHeader, TableRow,
-} from "@/components/ui/table";
-import { CheckCircle2Icon, AlertTriangleIcon, XCircleIcon } from "lucide-react";
+
+const STAT_KEYS: Array<{ key: keyof QualitySummary; label: string; format?: (v: number) => string }> = [
+  { key: "total",       label: "Total" },
+  { key: "trusted",     label: "Trusted" },
+  { key: "corrected",   label: "Corrected" },
+  { key: "rejected",    label: "Rejected" },
+  { key: "trusted_pct", label: "Trust Rate", format: (v) => `${v.toFixed(1)}%` },
+];
+
+const DECISION_COLOR: Record<string, string> = {
+  trusted:   "bg-emerald-100 text-emerald-700",
+  corrected: "bg-amber-100 text-amber-700",
+  rejected:  "bg-red-100 text-red-700",
+};
 
 export default function QualityPage() {
-  const { data, isLoading } = useQuery<QualitySummary>({
-    queryKey: ["quality"],
-    queryFn: async () =>
-      (await apiClient.get<QualitySummary>("/api/quality/summary")).data,
+  const { data, isLoading } = useQuery({
+    queryKey: ["quality-summary"],
+    queryFn: async () => (await apiClient.get<QualitySummary>("/api/quality/summary")).data,
   });
 
-  const total = data ? (data.total ?? (data.trusted + data.corrected + data.rejected)) : 0;
-  const pct = (n: number) =>
-    total > 0 ? `${((n / total) * 100).toFixed(1)}%` : "—";
-
   return (
-    <div className="flex flex-col gap-6">
+    <div className="space-y-8">
       <h1 className="text-2xl font-semibold">Data Quality</h1>
 
-      {isLoading ? (
-        <StatRowSkeleton />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <StatCard
-            label="Trusted"
-            value={data?.trusted ?? 0}
-            sub={pct(data?.trusted ?? 0)}
-            icon={CheckCircle2Icon}
-            iconClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
-          />
-          <StatCard
-            label="Corrected"
-            value={data?.corrected ?? 0}
-            sub={pct(data?.corrected ?? 0)}
-            icon={AlertTriangleIcon}
-            iconClass="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-          />
-          <StatCard
-            label="Rejected"
-            value={data?.rejected ?? 0}
-            sub={pct(data?.rejected ?? 0)}
-            icon={XCircleIcon}
-            iconClass="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-          />
-        </div>
-      )}
+      {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
 
-      {/* Recent events */}
-      <div>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Recent Quality Events
-        </h2>
-        {isLoading ? (
-          <TableSkeleton rows={5} cols={4} />
-        ) : !data?.recent_events?.length ? (
-          <div className="rounded-xl border border-border p-6 text-center text-sm text-muted-foreground">
-            No quality events recorded yet.
+      {data && (
+        <>
+          {/* Summary stat tiles — numeric fields only */}
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-5 max-w-3xl">
+            {STAT_KEYS.map(({ key, label, format }) => {
+              const raw = data[key] as number;
+              return (
+                <div key={key} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+                  <p className="mt-1 text-2xl font-semibold">
+                    {format ? format(raw) : raw}
+                  </p>
+                </div>
+              );
+            })}
           </div>
-        ) : (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead>Field</TableHead>
-                  <TableHead>Issue Type</TableHead>
-                  <TableHead>Case</TableHead>
-                  <TableHead>Decision</TableHead>
-                  <TableHead>Time</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(data.recent_events ?? []).map((ev) => (
-                  <TableRow key={ev.id}>
-                    <TableCell className="font-mono text-xs">
-                      {ev.field_name?.replace(/_/g, " ")}
-                    </TableCell>
-                    <TableCell className="text-sm capitalize">
-                      {ev.issue_type?.replace(/_/g, " ")}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {ev.case_id?.slice(0, 10) ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <CaseStatusBadge status={ev.decision} />
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(ev.created_at).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
+
+          {/* Recent events list */}
+          {data.recent_events.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Recent Events
+              </h2>
+              <div className="rounded-xl border border-slate-200 bg-white">
+                <ul className="divide-y divide-slate-100">
+                  {data.recent_events.map((ev) => (
+                    <li key={ev.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <span
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${
+                          DECISION_COLOR[ev.decision ?? ""] ?? "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {ev.decision ?? "—"}
+                      </span>
+                      <span className="text-sm">
+                        <strong>{ev.field_name ?? "—"}</strong>
+                        {ev.issue_type && (
+                          <> · <span className="text-slate-500">{ev.issue_type.replace(/_/g, " ")}</span></>
+                        )}
+                      </span>
+                      <span className="ml-auto shrink-0 text-xs text-slate-400">
+                        {new Date(ev.created_at).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }

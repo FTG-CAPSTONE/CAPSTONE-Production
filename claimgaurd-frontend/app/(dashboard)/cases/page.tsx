@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDownIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { fmtKES } from "@/lib/constants";
+import { formatCurrency } from "@/lib/utils";
 import type { CaseSummary } from "@/lib/types";
 import {
   Table, TableBody, TableCell, TableHead,
@@ -37,7 +37,23 @@ const LOB_OPTIONS = [
   { value: "general",      label: "General" },
 ];
 
-type SortKey = "submitted_at" | "amount" | "fraud_score";
+type SortKey = "submitted_at" | "amount_claimed" | "fraud_score";
+
+// Helper: get display reference from either field name
+function caseRef(c: CaseSummary) {
+  return c.external_claim_id ?? c.external_ref ?? c.id.slice(0, 8);
+}
+// Helper: parse amount from either shape
+function caseAmount(c: CaseSummary): number {
+  if (c.amount_claimed != null) return parseFloat(c.amount_claimed) || 0;
+  if (c.amount != null) return c.amount;
+  return 0;
+}
+// Helper: parse fraud score
+function caseFraudScore(c: CaseSummary): number {
+  if (c.fraud_score != null) return parseFloat(String(c.fraud_score)) || 0;
+  return 0;
+}
 
 export default function CasesPage() {
   const [status, setStatus] = useState("");
@@ -59,22 +75,23 @@ export default function CasesPage() {
     },
   });
 
-  // Client-side search + sort + paginate
-  const filtered = allCases
-    .filter((c) =>
-      !search ||
-      c.external_ref?.toLowerCase().includes(search.toLowerCase()) ||
-      c.id.toLowerCase().includes(search.toLowerCase()),
-    )
-    .sort((a, b) => {
-      let av: number | string = 0, bv: number | string = 0;
-      if (sortKey === "amount")      { av = a.amount ?? 0; bv = b.amount ?? 0; }
-      if (sortKey === "fraud_score") { av = a.fraud_score ?? 0; bv = b.fraud_score ?? 0; }
-      if (sortKey === "submitted_at"){ av = a.submitted_at ?? ""; bv = b.submitted_at ?? ""; }
-      if (av < bv) return sortDir === "asc" ? -1 :  1;
-      if (av > bv) return sortDir === "asc" ?  1 : -1;
-      return 0;
-    });
+  const filtered = useMemo(() => {
+    return allCases
+      .filter((c) => {
+        if (!search) return true;
+        const ref = caseRef(c).toLowerCase();
+        return ref.includes(search.toLowerCase()) || c.id.toLowerCase().includes(search.toLowerCase());
+      })
+      .sort((a, b) => {
+        let av: number | string = 0, bv: number | string = 0;
+        if (sortKey === "amount_claimed")  { av = caseAmount(a); bv = caseAmount(b); }
+        if (sortKey === "fraud_score")     { av = caseFraudScore(a); bv = caseFraudScore(b); }
+        if (sortKey === "submitted_at")    { av = a.submitted_at ?? ""; bv = b.submitted_at ?? ""; }
+        if (av < bv) return sortDir === "asc" ? -1 :  1;
+        if (av > bv) return sortDir === "asc" ?  1 : -1;
+        return 0;
+      });
+  }, [allCases, search, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -113,24 +130,18 @@ export default function CasesPage() {
           onChange={(e) => { setStatus(e.target.value); setPage(1); }}
           className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
-          {STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
+          {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <select
           value={lob}
           onChange={(e) => { setLob(e.target.value); setPage(1); }}
           className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
-          {LOB_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
+          {LOB_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         {(status || lob || search) && (
-          <Button
-            variant="ghost" size="sm"
-            onClick={() => { setStatus(""); setLob(""); setSearch(""); setPage(1); }}
-          >
+          <Button variant="ghost" size="sm"
+            onClick={() => { setStatus(""); setLob(""); setSearch(""); setPage(1); }}>
             Clear filters
           </Button>
         )}
@@ -149,9 +160,9 @@ export default function CasesPage() {
                 <TableHead>Line of Business</TableHead>
                 <TableHead
                   className="cursor-pointer select-none"
-                  onClick={() => toggleSort("amount")}
+                  onClick={() => toggleSort("amount_claimed")}
                 >
-                  Amount <SortIcon col="amount" />
+                  Amount <SortIcon col="amount_claimed" />
                 </TableHead>
                 <TableHead
                   className="cursor-pointer select-none"
@@ -179,9 +190,8 @@ export default function CasesPage() {
               {paged.map((c) => {
                 const isExpanded = expandedId === c.id;
                 return (
-                  <>
+                  <React.Fragment key={c.id}>
                     <TableRow
-                      key={c.id}
                       className="cursor-pointer group"
                       onClick={() => setExpandedId(isExpanded ? null : c.id)}
                     >
@@ -197,32 +207,30 @@ export default function CasesPage() {
                           onClick={(e) => e.stopPropagation()}
                           className="text-primary hover:underline"
                         >
-                          {c.external_ref ?? c.id.slice(0, 8)}
+                          {caseRef(c)}
                         </Link>
                       </TableCell>
                       <TableCell className="capitalize text-sm text-muted-foreground">
                         {c.line_of_business?.replace(/_/g, " ") ?? "—"}
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {fmtKES(c.amount)}
+                        {formatCurrency(c.amount_claimed ?? c.amount ?? null)}
                       </TableCell>
                       <TableCell>
-                        <RiskBadge band={c.fraud_band} score={c.fraud_score} />
+                        <RiskBadge band={c.fraud_band} score={c.fraud_score != null ? parseFloat(String(c.fraud_score)) : null} />
                       </TableCell>
                       <TableCell>
                         <CaseStatusBadge status={c.status} />
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
-                        {c.submitted_at
-                          ? new Date(c.submitted_at).toLocaleDateString()
-                          : "—"}
+                        {c.submitted_at ? new Date(c.submitted_at).toLocaleDateString() : "—"}
                       </TableCell>
                     </TableRow>
 
-                    {/* Expanded row */}
+                    {/* Expanded detail row */}
                     <AnimatePresence initial={false}>
                       {isExpanded && (
-                        <tr key={`${c.id}-exp`}>
+                        <tr>
                           <td colSpan={7} className="p-0">
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
@@ -233,8 +241,8 @@ export default function CasesPage() {
                             >
                               <div className="flex items-center gap-6 bg-muted/30 border-b border-border px-6 py-3 text-sm">
                                 <span className="text-muted-foreground">
-                                  <span className="font-medium text-foreground">Case type:</span>{" "}
-                                  {c.case_type ?? "—"}
+                                  <span className="font-medium text-foreground">Type:</span>{" "}
+                                  {c.claim_type ?? c.case_type ?? "—"}
                                 </span>
                                 <span className="text-muted-foreground">
                                   <span className="font-medium text-foreground">ID:</span>{" "}
@@ -253,7 +261,7 @@ export default function CasesPage() {
                         </tr>
                       )}
                     </AnimatePresence>
-                  </>
+                  </React.Fragment>
                 );
               })}
             </TableBody>
@@ -264,9 +272,7 @@ export default function CasesPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Page {page} of {totalPages} · {filtered.length} cases
-          </span>
+          <span>Page {page} of {totalPages} · {filtered.length} cases</span>
           <div className="flex gap-1">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
               ← Prev

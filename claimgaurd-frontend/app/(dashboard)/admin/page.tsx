@@ -1,207 +1,240 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { PlusIcon, Loader2Icon } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import type { UserRecord, Role } from "@/lib/types";
-import {
-  Table, TableBody, TableCell, TableHead,
-  TableHeader, TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import {
-  Dialog, DialogContent, DialogHeader,
-  DialogTitle, DialogDescription,
-} from "@/components/ui/dialog";
-import { TableSkeleton } from "@/components/shared/loading-skeleton";
-import { EmptyState } from "@/components/shared/empty-state";
+import type { UserOut } from "@/lib/types";
 
-const ROLES: Role[] = [
-  "admin","underwriter","adjuster","investigator",
-  "ml_admin","compliance","corporate_risk","viewer",
-];
-
-const ROLE_BADGES: Record<string, string> = {
-  admin:          "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-  underwriter:    "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  adjuster:       "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
-  investigator:   "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  ml_admin:       "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  compliance:     "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
-  corporate_risk: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
-  viewer:         "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+const ROLE_BADGE: Record<string, string> = {
+  admin:      "bg-purple-100 text-purple-700",
+  reviewer:   "bg-blue-100 text-blue-700",
+  analyst:    "bg-teal-100 text-teal-700",
+  viewer:     "bg-slate-100 text-slate-600",
 };
 
-interface CreatePayload {
-  username: string; full_name: string;
-  email: string; role: Role; password: string;
+interface CreateUserForm {
+  username: string;
+  full_name: string;
+  email: string;
+  password: string;
+  role: string;
 }
+
+const EMPTY_FORM: CreateUserForm = {
+  username: "",
+  full_name: "",
+  email: "",
+  password: "",
+  role: "reviewer",
+};
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState<CreatePayload>({
-    username: "", full_name: "", email: "", role: "viewer", password: "",
-  });
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState<CreateUserForm>(EMPTY_FORM);
+  const [formError, setFormError] = useState("");
 
-  const { data = [], isLoading } = useQuery<UserRecord[]>({
+  const { data: users, isLoading } = useQuery({
     queryKey: ["users"],
-    queryFn: async () => (await apiClient.get<UserRecord[]>("/api/users")).data,
+    queryFn: async () =>
+      (await apiClient.get<UserOut[]>("/api/users")).data,
   });
 
-  const createUser = useMutation({
-    mutationFn: async (payload: CreatePayload) =>
-      apiClient.post<UserRecord>("/api/auth/register", payload),
+  // Create user: POST /api/auth/register
+  const createMutation = useMutation({
+    mutationFn: async (payload: CreateUserForm) =>
+      apiClient.post<UserOut>("/api/auth/register", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      toast.success("User created");
-      setCreateOpen(false);
-      setForm({ username: "", full_name: "", email: "", role: "viewer", password: "" });
+      setForm(EMPTY_FORM);
+      setShowCreate(false);
+      setFormError("");
     },
-    onError: () => toast.error("Failed to create user"),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail ?? "Failed to create user.";
+      setFormError(typeof msg === "string" ? msg : JSON.stringify(msg));
+    },
   });
 
-  const updateRole = useMutation({
-    mutationFn: async ({ id, role }: { id: string; role: string }) =>
-      apiClient.patch(`/api/users/${id}`, { role }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      toast.success("Role updated");
-    },
-    onError: () => toast.error("Failed to update role"),
-  });
-
-  const toggleActive = useMutation({
+  // Toggle active: PATCH /api/users/{id}  body: { is_active: bool }
+  const toggleMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) =>
       apiClient.patch(`/api/users/${id}`, { is_active }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-    },
-    onError: () => toast.error("Failed to update status"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) {
+    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  }
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">User Management</h1>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <PlusIcon className="size-3.5 mr-1.5" />
-          Create User
-        </Button>
+        <div>
+          <h1 className="text-2xl font-semibold">User Management</h1>
+          <p className="text-sm text-slate-500">
+            Manage system users, roles, and account status.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
+        >
+          + Add User
+        </button>
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={5} cols={5} />
+        <p className="text-sm text-slate-500">Loading…</p>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead>Username</TableHead>
-                <TableHead>Full Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Active</TableHead>
-                <TableHead>Created</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6}>
-                    <EmptyState variant="no-data" title="No users" body="Create the first user above." />
-                  </TableCell>
-                </TableRow>
-              )}
-              {data.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium font-mono text-xs">{u.username}</TableCell>
-                  <TableCell className="text-sm">{u.full_name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
-                  <TableCell>
-                    <select
-                      defaultValue={u.role}
-                      onChange={(e) => updateRole.mutate({ id: u.id, role: e.target.value })}
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium border-0 cursor-pointer focus:outline-none ${
-                        ROLE_BADGES[u.role] ?? "bg-muted text-muted-foreground"
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Username</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Last Login</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {(users ?? []).map((u) => (
+                <tr
+                  key={u.id}
+                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                >
+                  <td className="px-4 py-3 font-medium">
+                    {u.full_name ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs">{u.username}</td>
+                  <td className="px-4 py-3 text-slate-600">{u.email ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs ${
+                        ROLE_BADGE[u.role] ?? "bg-slate-100 text-slate-600"
                       }`}
                     >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
-                      ))}
-                    </select>
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={u.is_active}
-                      onCheckedChange={(v) => toggleActive.mutate({ id: u.id, is_active: v })}
-                    />
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(u.created_at).toLocaleDateString()}
-                  </TableCell>
-                </TableRow>
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs ${
+                        u.is_active
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-red-100 text-red-600"
+                      }`}
+                    >
+                      {u.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-400">
+                    {u.last_login_at
+                      ? new Date(u.last_login_at).toLocaleDateString()
+                      : "Never"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() =>
+                        toggleMutation.mutate({
+                          id: u.id,
+                          is_active: !u.is_active,
+                        })
+                      }
+                      className="text-xs text-blue-700 hover:underline"
+                    >
+                      {u.is_active ? "Deactivate" : "Activate"}
+                    </button>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Create user dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create User</DialogTitle>
-            <DialogDescription>
-              The user will be able to log in immediately with the provided credentials.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            {(["username", "full_name", "email", "password"] as const).map((field) => (
-              <div key={field}>
-                <label className="mb-1.5 block text-sm font-medium capitalize">
-                  {field.replace(/_/g, " ")}
+      {/* Create user modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="mb-4 text-base font-semibold">Add New User</h2>
+
+            <div className="space-y-3">
+              {(
+                [
+                  { name: "full_name",  label: "Full Name",       type: "text"     },
+                  { name: "username",   label: "Username",         type: "text"     },
+                  { name: "email",      label: "Email",            type: "email"    },
+                  { name: "password",   label: "Password",         type: "password" },
+                ] as const
+              ).map(({ name, label, type }) => (
+                <div key={name}>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">
+                    {label}
+                  </label>
+                  <input
+                    type={type}
+                    name={name}
+                    value={form[name]}
+                    onChange={handleChange}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              ))}
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  Role
                 </label>
-                <input
-                  type={field === "password" ? "password" : "text"}
-                  value={form[field]}
-                  onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
+                <select
+                  name="role"
+                  value={form.role}
+                  onChange={handleChange}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="reviewer">Reviewer</option>
+                  <option value="analyst">Analyst</option>
+                  <option value="viewer">Viewer</option>
+                </select>
               </div>
-            ))}
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Role</label>
-              <select
-                value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))}
-                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            </div>
+
+            {formError && (
+              <p className="mt-3 text-xs text-red-600">{formError}</p>
+            )}
+
+            <div className="mt-4 flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowCreate(false);
+                  setForm(EMPTY_FORM);
+                  setFormError("");
+                }}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
-                ))}
-              </select>
+                Cancel
+              </button>
+              <button
+                disabled={
+                  !form.username || !form.password || createMutation.isPending
+                }
+                onClick={() => createMutation.mutate(form)}
+                className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 hover:bg-blue-800"
+              >
+                {createMutation.isPending ? "Creating…" : "Create User"}
+              </button>
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button
-              onClick={() => createUser.mutate(form)}
-              disabled={
-                !form.username || !form.email || !form.password ||
-                createUser.isPending
-              }
-            >
-              {createUser.isPending
-                ? <><Loader2Icon className="size-4 animate-spin mr-1.5" />Creating…</>
-                : "Create User"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 }

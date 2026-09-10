@@ -60,7 +60,7 @@ export function ShapBarChart({
   if (!features.length) return null;
 
   const data = features.map((f) => ({
-    feature: f.feature.replace(/_/g, " "),
+    feature: (f.feature ?? "").replace(/_/g, " "),
     impact: f.impact,
   }));
 
@@ -97,7 +97,7 @@ export function ShapBarChart({
             {data.map((entry, i) => (
               <Cell
                 key={i}
-                fill={entry.impact >= 0 ? "#ea580c" : "#16a34a"}
+                fill={(entry.impact ?? 0) >= 0 ? "#ea580c" : "#16a34a"}
                 fillOpacity={0.85}
               />
             ))}

@@ -1,115 +1,206 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import type { Investigation } from "@/lib/types";
-import {
-  Table, TableBody, TableCell, TableHead,
-  TableHeader, TableRow,
-} from "@/components/ui/table";
-import { EmptyState } from "@/components/shared/empty-state";
-import { TableSkeleton } from "@/components/shared/loading-skeleton";
-import { cn } from "@/lib/utils";
 
-const STATUS_CLASSES: Record<string, string> = {
-  open:           "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  in_progress:    "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  closed:         "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  referred_to_ira:"bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+const STATUS_COLOR: Record<string, string> = {
+  open:       "bg-amber-100 text-amber-700",
+  closed:     "bg-slate-100 text-slate-600",
+  in_progress:"bg-blue-100 text-blue-700",
 };
 
-const OUTCOME_CLASSES: Record<string, string> = {
-  fraud_confirmed: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-  legitimate:      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  inconclusive:    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+const OUTCOME_COLOR: Record<string, string> = {
+  confirmed_fraud: "bg-red-100 text-red-700",
+  not_fraud:       "bg-emerald-100 text-emerald-700",
+  inconclusive:    "bg-slate-100 text-slate-600",
 };
 
 export default function InvestigationsPage() {
-  const { data = [], isLoading } = useQuery<Investigation[]>({
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<Investigation | null>(null);
+  const [findings, setFindings] = useState("");
+  const [outcome, setOutcome] = useState<"confirmed_fraud" | "not_fraud" | "inconclusive">("inconclusive");
+
+  const { data: investigations, isLoading } = useQuery({
     queryKey: ["investigations"],
     queryFn: async () =>
-      (await apiClient.get<Investigation[]>("/api/investigations")).data,
+      (await apiClient.get<Investigation[]>("/api/hitl/investigations")).data,
+  });
+
+  // Close an investigation: POST /api/hitl/investigations/{id}/close
+  const closeMutation = useMutation({
+    mutationFn: async ({
+      id,
+      findings,
+      outcome,
+    }: {
+      id: string;
+      findings: string;
+      outcome: string;
+    }) =>
+      apiClient.post(`/api/hitl/investigations/${id}/close`, { findings, outcome }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investigations"] });
+      setSelected(null);
+      setFindings("");
+    },
   });
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Investigations</h1>
-        <span className="text-sm text-muted-foreground">{data.length} total</span>
-      </div>
-      <p className="text-sm text-muted-foreground -mt-2">
-        Escalated cases under active investigation.
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold">Investigations</h1>
+      <p className="text-sm text-slate-500">
+        Active and closed fraud investigations. Open an investigation from the Review Queue.
       </p>
 
       {isLoading ? (
-        <TableSkeleton rows={6} cols={5} />
+        <p className="text-sm text-slate-500">Loading…</p>
+      ) : !investigations?.length ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+          No investigations yet.{" "}
+          <Link href="/hitl" className="text-blue-700 hover:underline">
+            Go to Review Queue →
+          </Link>
+        </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead>ID</TableHead>
-                <TableHead>Case</TableHead>
-                <TableHead>Investigator</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Outcome</TableHead>
-                <TableHead>Opened</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7}>
-                    <EmptyState variant="no-data" title="No investigations" body="Escalated cases will appear here." />
-                  </TableCell>
-                </TableRow>
-              )}
-              {data.map((inv) => (
-                <TableRow key={inv.id}>
-                  <TableCell className="font-mono text-xs">{inv.id.slice(0, 10)}…</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    <Link href={`/cases/${inv.case_id}`} className="text-primary hover:underline">
-                      {inv.case_id.slice(0, 10)}…
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3">Case</th>
+                <th className="px-4 py-3">Investigator</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Outcome</th>
+                <th className="px-4 py-3">Opened</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {investigations.map((inv) => (
+                <tr
+                  key={inv.id}
+                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                >
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/cases/${inv.case_id}`}
+                      className="font-mono text-xs text-blue-700 hover:underline"
+                    >
+                      {inv.case_id.slice(0, 8)}
                     </Link>
-                  </TableCell>
-                  <TableCell className="text-sm">{inv.investigator_name}</TableCell>
-                  <TableCell>
-                    <span className={cn(
-                      "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
-                      STATUS_CLASSES[inv.status] ?? "bg-muted text-muted-foreground",
-                    )}>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {inv.investigator_name ?? "Unassigned"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs ${
+                        STATUS_COLOR[inv.status] ?? "bg-slate-100 text-slate-600"
+                      }`}
+                    >
                       {inv.status.replace(/_/g, " ")}
                     </span>
-                  </TableCell>
-                  <TableCell>
+                  </td>
+                  <td className="px-4 py-3">
                     {inv.outcome ? (
-                      <span className={cn(
-                        "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
-                        OUTCOME_CLASSES[inv.outcome] ?? "bg-muted text-muted-foreground",
-                      )}>
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs ${
+                          OUTCOME_COLOR[inv.outcome] ?? "bg-slate-100 text-slate-600"
+                        }`}
+                      >
                         {inv.outcome.replace(/_/g, " ")}
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Pending</span>
+                      <span className="text-slate-400">—</span>
                     )}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-400">
                     {new Date(inv.opened_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/investigations/${inv.id}`}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Open →
-                    </Link>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {inv.status !== "closed" && (
+                      <button
+                        onClick={() => {
+                          setSelected(inv);
+                          setFindings(inv.findings ?? "");
+                        }}
+                        className="rounded-md bg-slate-800 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700"
+                      >
+                        Close
+                      </button>
+                    )}
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Close investigation modal */}
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="mb-1 text-base font-semibold">Close Investigation</h2>
+            <p className="mb-4 text-xs text-slate-500">
+              Case {selected.case_id.slice(0, 8)}
+            </p>
+
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Outcome
+            </label>
+            <select
+              value={outcome}
+              onChange={(e) =>
+                setOutcome(e.target.value as typeof outcome)
+              }
+              className="mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="confirmed_fraud">Confirmed Fraud</option>
+              <option value="not_fraud">Not Fraud</option>
+              <option value="inconclusive">Inconclusive</option>
+            </select>
+
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Findings
+            </label>
+            <textarea
+              value={findings}
+              onChange={(e) => setFindings(e.target.value)}
+              rows={4}
+              placeholder="Summarise investigation findings…"
+              className="mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setSelected(null)}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!findings.trim() || closeMutation.isPending}
+                onClick={() =>
+                  closeMutation.mutate({
+                    id: selected.id,
+                    findings: findings.trim(),
+                    outcome,
+                  })
+                }
+                className="rounded-md bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 hover:bg-red-800"
+              >
+                {closeMutation.isPending ? "Closing…" : "Close Investigation"}
+              </button>
+            </div>
+
+            {closeMutation.isError && (
+              <p className="mt-2 text-xs text-red-600">Failed to close. Try again.</p>
+            )}
+          </div>
         </div>
       )}
     </div>

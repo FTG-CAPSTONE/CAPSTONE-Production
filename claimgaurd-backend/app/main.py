@@ -80,10 +80,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Startup and shutdown logic."""
     logger.info("claimguard.startup", env=settings.APP_ENV)
 
-    # Dev only — create tables if they don't exist (prod uses Alembic)
-    if settings.is_development:
-        await init_db()
-        logger.info("claimguard.db.ready")
+    # Always create tables if they don't exist, then seed roles + admin.
+    # create_all is idempotent — it is a no-op when tables already exist,
+    # so this is safe in both development and production (Render fresh DB).
+    await init_db()
+    logger.info("claimguard.db.ready")
 
     yield
 
@@ -161,6 +162,9 @@ def create_app() -> FastAPI:
 
     from app.audit.router import router as audit_router
     app.include_router(audit_router)
+
+    from app.network.router import router as network_router
+    app.include_router(network_router)
 
     # ── Health check ──────────────────────────────────────────────────────────
     @app.get("/health", tags=["system"])

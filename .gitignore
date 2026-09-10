@@ -6,7 +6,7 @@ __pycache__/
 *$py.class
 *.so
 *.pyd
-
+DEVELOPMENT_BRANCH_IMPACT_ANALYSIS.md
 # Distribution / packaging
 .Python
 build/
@@ -134,3 +134,4 @@ credentials
 REFERENCE/
 REFERENCE*/
 *.zip
+!claimgaurd-frontend/lib/

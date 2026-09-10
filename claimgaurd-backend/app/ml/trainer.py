@@ -291,14 +291,17 @@ def _build_dataset(db) -> Tuple["pd.DataFrame", "np.ndarray"]:
 def _save_artifact(model, model_family: str) -> str:
     """
     Save pickled model. Returns the artifact path string.
-    Uses local filesystem in dev (no MinIO needed), MinIO in prod.
+    - Uses local /tmp filesystem when OBJECT_STORAGE_ENDPOINT is blank (Render free tier)
+    - Uses MinIO/S3 when OBJECT_STORAGE_ENDPOINT is configured (production with storage)
     """
     from app.core.config import settings
 
     artifact_bytes = pickle.dumps(model)
 
-    if settings.is_development:
-        # Local filesystem — store in a tmp dir under the project
+    # Fall back to local filesystem if object storage is not configured
+    use_local = settings.is_development or not settings.OBJECT_STORAGE_ENDPOINT.strip()
+
+    if use_local:
         os.makedirs("/tmp/claimguard_models", exist_ok=True)
         fname = f"{model_family}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pkl"
         local_path = f"/tmp/claimguard_models/{fname}"

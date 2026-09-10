@@ -1,12 +1,52 @@
-# ClaimGuard — Backend
+# ClaimGuard
 
-Python/FastAPI backend for the ClaimGuard claims intelligence platform.
-
-> **See the root [`README.md`](../README.md) for full project setup including database creation, frontend startup, and seeding.**
+AI-assisted claims intelligence platform for bancassurance. Ingests motor insurance claims, runs a rules engine and XGBoost fraud scorer, routes high-risk cases to human review, and gives adjusters a full decision audit trail.
 
 ---
 
-## Start
+## Project Structure
+
+```
+claim-gaurd/
+├── claimgaurd-backend/   Python/FastAPI API + Celery workers + ML pipeline
+├── claimgaurd-frontend/  Next.js 16 / React 19 / TypeScript dashboard
+└── backend/              Java microservices (future architecture — all placeholder files)
+```
+
+---
+
+## Quick Start — Local Dev
+
+### Prerequisites
+
+| Tool | Version | Check |
+|------|---------|-------|
+| Python | 3.12 | `python3 --version` |
+| uv | latest | `uv --version` |
+| Node.js | 18+ | `node --version` |
+| pnpm | 8+ | `pnpm --version` |
+| PostgreSQL | 16 | `pg_isready` |
+| Redis | 7 | `redis-cli ping` |
+
+Install `uv` if missing:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+---
+
+## 1. Database Setup (one-time)
+
+```bash
+# Create the database user and database
+psql -U postgres -c "CREATE USER claimguard WITH ENCRYPTED PASSWORD 'cg_secure_2026';"
+psql -U postgres -c "CREATE DATABASE claimguard OWNER claimguard;"
+```
+
+---
+
+## 2. Backend
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -15,136 +55,109 @@ cd claimgaurd-backend
 # First time only
 uv venv --python 3.12
 uv pip install -r requirements.txt
-cp .env.example .env
-alembic upgrade head
+cp .env.example .env          # dev defaults are already correct — no edits needed
+
+# Apply database migrations (22 tables)
+.venv/bin/alembic upgrade head
 
 # Start the API server
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-- API: **http://localhost:8000**
-- Swagger docs: **http://localhost:8000/docs**
-- Health check: `GET /health`
+| URL | Purpose |
+|-----|---------|
+| http://localhost:8000 | API root |
+| http://localhost:8000/docs | Swagger UI |
+| http://localhost:8000/health | Health check |
 
----
+**Optional — Celery workers** (needed for background ETL/ML, not for basic dev):
 
-## Module Layout
-
-```
-app/
-├── core/          config, security (JWT + bcrypt), db sessions, FastAPI deps
-├── users/         auth endpoints, user/role CRUD
-├── integration/   InsureMaster adapter (faker dev mode / live stub)
-├── ingestion/     webhook receiver, batch upload, dev/seed endpoint
-├── etl/           validate → transform → enrich → features → quality gate
-├── rules/         8 motor rules engine (hard-fail + soft-flag)
-├── ml/            XGBoost trainer, scorer, SHAP explainer, model registry
-├── hitl/          review queue, investigations, decision recording
-├── cases/         case CRUD, detail, decision, similar cases
-├── analytics/     portfolio KPI aggregations
-├── quality/       data quality event tracking
-└── audit/         case event timeline search
-
-synth/             Faker synthetic data (Kenya motor insurance)
-workers/           Celery app + beat schedule
-migrations/        Alembic migration scripts
-```
-
----
-
-## Key Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/auth/register` | Create user |
-| `POST` | `/api/auth/login` | OAuth2 login → JWT |
-| `GET` | `/api/cases` | Case list (filterable) |
-| `GET` | `/api/cases/{id}` | Full case detail + SHAP + rules + events |
-| `POST` | `/api/cases/{id}/decision` | Record human decision |
-| `GET` | `/api/hitl/queue` | Priority-sorted HITL queue |
-| `POST` | `/api/hitl/investigations` | Open investigation |
-| `POST` | `/api/ingestion/dev/seed` | Seed synthetic claims (dev only) |
-| `POST` | `/api/ingestion/batch/process-pending` | Trigger ETL on all pending intakes |
-| `POST` | `/api/ml/retrain` | Train new XGBoost challenger |
-| `PATCH` | `/api/ml/model-registry/{id}/promote` | Promote challenger → champion |
-| `GET` | `/api/analytics/overview` | Portfolio KPIs |
-| `GET` | `/api/audit` | Audit trail search |
-
-Full catalogue at **http://localhost:8000/docs**.
-
----
-
-## ETL Pipeline
-
-Each ingested claim runs through this synchronous chain:
-
-```
-validate → transform → enrich → feature engineering (25 features)
-→ rules engine (8 rules) → ML scoring (XGBoost + SHAP)
-→ route: auto_approved | auto_rejected | in_review (HITL queue)
-```
-
-Run pending claims manually (dev, no Celery/Redis needed):
-
-```python
-from app.etl.tasks import run_etl_sync
-from app.core.db import SyncSessionLocal
-from sqlalchemy import select
-from app.ingestion.models import RawIntake
-import app.users.models, app.cases.models, app.ml.models
-import app.hitl.models, app.quality.models, app.rules.models, app.ingestion.models
-
-db = SyncSessionLocal()
-rows = db.execute(select(RawIntake).where(RawIntake.etl_status=='pending')).scalars().all()
-db.close()
-for r in rows:
-    run_etl_sync(str(r.id))
-```
-
----
-
-## ML Pipeline
-
-1. Seed claims and process them through ETL (creates labeled `feature_snapshot` rows)
-2. `POST /api/ml/retrain` — trains XGBoost on all labeled snapshots, registers as challenger
-3. Review metrics in ML Admin Portal (`/ml-admin` on frontend)
-4. `PATCH /api/ml/model-registry/{id}/promote` — manually promote to champion
-5. New claims will now be scored automatically during ETL
-
-Model artifacts are saved to `/tmp/claimguard_models/` in development.
-
----
-
-## Database
-
-- **User:** `claimguard` / **Password:** `cg_secure_2026`
-- **Database:** `claimguard`
-- **Host:** `127.0.0.1:5432`
-- **22 tables** — see `migrations/versions/001_initial_schema.py` for the full schema
-
-Run migrations:
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
-.venv/bin/alembic upgrade head
+# Terminal 2: worker
+.venv/bin/celery -A workers.celery_app worker \
+  --loglevel=info -Q default,etl,ml,notifications --concurrency=2
+
+# Terminal 3: beat scheduler
+.venv/bin/celery -A workers.celery_app beat --loglevel=info
 ```
 
 ---
 
-## Environment Variables
+## 3. Frontend
 
-Copy `.env.example` to `.env`. Key variables:
+```bash
+cd claimgaurd-frontend
+pnpm install
+cp .env.local.example .env.local   # points NEXT_PUBLIC_API_BASE_URL at localhost:8000
+pnpm dev
+```
 
-| Variable | Default | Note |
-|----------|---------|------|
-| `SECRET_KEY` | `changeme-dev-key-...` | **Change before any real deployment** |
-| `DATABASE_URL` | `postgresql+psycopg2://claimguard:cg_secure_2026@127.0.0.1:5432/claimguard` | Sync URL |
-| `ASYNC_DATABASE_URL` | `postgresql+asyncpg://...` | Async URL for FastAPI endpoints |
-| `INSUREMASTER_MODE` | `faker` | Set to `live` when real InsureMaster access exists |
-| `ENABLE_DEV_SEED_ENDPOINT` | `true` | **Must be `false` with real data** |
+Frontend: **http://localhost:3000**
+
+> The backend must be running on port 8000 before the frontend will work.
 
 ---
 
-## Roles
+## 4. Seed Dev Data
+
+With the backend running, create a user and load synthetic claims:
+
+```bash
+# Create admin user
+curl -s -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","full_name":"Admin User","email":"admin@local.dev","password":"Admin@1234","role":"admin"}' \
+  | python3 -m json.tool
+
+# Seed 100 synthetic Kenya motor insurance claims
+curl -s -X POST http://localhost:8000/api/ingestion/dev/seed \
+  -H "Content-Type: application/json" \
+  -d '{"count": 100}' | python3 -m json.tool
+
+# Run ETL pipeline — validates, scores, and routes all pending claims
+curl -s -X POST http://localhost:8000/api/ingestion/batch/process-pending \
+  | python3 -m json.tool
+```
+
+This populates cases, fraud scores, rule evaluations, and the HITL review queue.
+
+---
+
+## 5. Full Docker Stack (alternative to steps 1–4)
+
+Starts API + Celery + PostgreSQL + Redis + MinIO in one command:
+
+```bash
+cd claimgaurd-backend/docker
+docker compose up -d
+
+# Watch logs
+docker compose logs -f api
+
+# Stop (keeps data)
+docker compose down
+
+# Stop and wipe everything
+docker compose down -v
+```
+
+Migrations run automatically. The API will be on http://localhost:8000 and the database on port 5432.
+
+---
+
+## Dev URLs at a Glance
+
+| Service | URL | Notes |
+|---------|-----|-------|
+| Frontend | http://localhost:3000 | Next.js dev server |
+| API | http://localhost:8000 | FastAPI + uvicorn |
+| Swagger UI | http://localhost:8000/docs | Full API explorer |
+| Metrics | http://localhost:8000/metrics | Prometheus |
+| MinIO console | http://localhost:9001 | minioadmin / minioadmin (if running) |
+
+---
+
+## User Roles
 
 | Role | Access |
 |------|--------|
@@ -154,5 +167,49 @@ Copy `.env.example` to `.env`. Key variables:
 | `investigator` | Investigations, HITL queue |
 | `ml_admin` | Model registry, retrain, promote |
 | `compliance` | Audit trail, quality reports |
-| `corporate_risk` | Corporate workspace (Phase 2) |
 | `viewer` | Read-only |
+
+---
+
+## Key Environment Variables
+
+Both `.env.example` (backend) and `.env.local.example` (frontend) have correct dev defaults. The only variables you'd need to change for local development:
+
+| File | Variable | When to change |
+|------|----------|----------------|
+| `claimgaurd-backend/.env` | `DATABASE_URL` | If your Postgres is on a non-default host/port |
+| `claimgaurd-backend/.env` | `SECRET_KEY` | Before any deployment outside localhost |
+| `claimgaurd-backend/.env` | `ENABLE_DEV_SEED_ENDPOINT` | Set to `false` before touching real data |
+| `claimgaurd-frontend/.env.local` | `NEXT_PUBLIC_API_BASE_URL` | If backend runs on a different port |
+
+---
+
+## Syncing the Frontend to the Capstone Frontend Repo
+
+The `claimgaurd-frontend/` folder is also maintained as a standalone repo at
+[FTG-CAPSTONE/frontend-dev](https://github.com/FTG-CAPSTONE/frontend-dev) for Vercel deployment.
+
+Use `git subtree push` to sync changes from the monorepo to that repo **without affecting
+the monorepo root or any other folder**:
+
+```bash
+# Run from the monorepo root
+cd /home/kakito/Documents/PROJECT/claim-gaurd
+
+git subtree push --prefix=claimgaurd-frontend https://github.com/FTG-CAPSTONE/frontend-dev.git main
+```
+
+**When to run this:**
+- After any frontend commit that is ready to deploy to Vercel
+- Vercel watches `FTG-CAPSTONE/frontend-dev` and auto-deploys on every push
+
+**This does not affect:**
+- The root monorepo (`claim-gaurd`) — all folders, history, and remotes stay intact
+- The backend — `claimgaurd-backend/` is never touched by this command
+
+---
+
+## Further Reading
+
+- [`claimgaurd-backend/README.md`](claimgaurd-backend/README.md) — backend module layout, ETL pipeline, ML pipeline, all endpoints, Docker details
+- [`claimgaurd-frontend/README.md`](claimgaurd-frontend/README.md) — frontend pages, known simplifications, build verification notes

@@ -25,25 +25,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # enable corepack so pnpm is available before setup-node runs
-      - name: Enable corepack (pnpm)
-        run: corepack enable
-
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "pnpm"
-          cache-dependency-path: claimgaurd-frontend/pnpm-lock.yaml
+          cache: "npm"
+          cache-dependency-path: claimgaurd-frontend/package-lock.json
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Build (type-check + production build)
-        run: pnpm build
+        run: npm run build
         env:
-          # Suppress Next.js telemetry in CI
           NEXT_TELEMETRY_DISABLED: 1
+          # Dummy backend URL so next.config.ts proxy rewrite resolves during build
+          BACKEND_URL: http://localhost:8000
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
